@@ -134,38 +134,6 @@ class PromptManager:
             **kwargs
         )
     
-    def add_custom_prompt(
-        self,
-        name: str,
-        template: str,
-        criteria: str = "",
-        formatter: str = "",
-        override: bool = False
-    ) -> None:
-        """
-        Register a new custom prompt type with JSON formatting
-        
-        Args:
-            name: Unique name for the prompt type
-            template: Prompt template string with {formatter} placeholder
-            criteria: Evaluation criteria description
-            formatter: JSON formatting instructions with example
-            override: Whether to overwrite existing prompt
-        """
-        if not override and name in self.custom_prompts:
-            raise ValueError(f"Prompt '{name}' already exists")
-            
-        self.custom_prompts[name] = {
-            'template': template,
-            'criteria': criteria,
-            'formatter': formatter
-        }
-    
-    def get_custom_prompt(self, name: str) -> Dict[str, str]:
-        """Retrieve a registered custom prompt with formatting"""
-        if name not in self.custom_prompts:
-            raise ValueError(f"Custom prompt '{name}' not found")
-        return self.custom_prompts[name]
 
 # Example usage
 if __name__ == "__main__":
@@ -186,25 +154,3 @@ if __name__ == "__main__":
     
     print("Relevance Evaluation Prompt:")
     print(prompt)
-    
-    # Add and use a custom prompt
-    pm.add_custom_prompt(
-        name="completeness",
-        template=(
-            "Evaluate answer completeness:\n"
-            "Question: {question}\nAnswer: {answer}\n"
-            "Required aspects: {required_aspects}\nEvaluation:"
-        ),
-        criteria="Coverage of all question aspects"
-    )
-    
-    custom_prompt = pm.build_prompt(
-        question="Explain machine learning",
-        context="",
-        answer="ML is about algorithms learning from data",
-        eval_type=EvaluationType.FACTUAL_ACCURACY,
-        required_aspects="Definition, examples, applications"
-    )
-    
-    print("\nCustom Prompt:")
-    print(custom_prompt)

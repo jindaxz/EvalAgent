@@ -131,8 +131,8 @@ if __name__ == "__main__":
 
     # OpenAI client example
     openai_llm = OpenAIClientLLM()
-    print("OpenAI response:", openai_llm.invoke("Hello world!"))
+    print("OpenAI response:", openai_llm.generate("Hello world!"))
     
     # HTTP client example
     http_llm = HTTPLLM()
-    print("HTTP response:", http_llm.invoke("Explain quantum computing in 3 sentences"))
+    print("HTTP response:", http_llm.generate("Explain quantum computing in 3 sentences"))
