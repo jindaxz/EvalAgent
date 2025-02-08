@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any, Dict, List
 from .prompt_manager import EvaluationType
 
 class RAGEvaluator(ABC):
@@ -17,7 +17,7 @@ class RAGEvaluator(ABC):
         self.prompt_manager = prompt_manager
     
     @abstractmethod
-    def pre_process(self, question: str, context: str, answer: str) -> Any:
+    def pre_process(self, question: str|List[str], context: str|List[str], answer: str|List[str]) -> Any:
         """
         Prepare and format the evaluation input.
         
