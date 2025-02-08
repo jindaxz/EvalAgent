@@ -24,7 +24,7 @@ class EvaluationType(BasePrompt):
     ANSWER_EQUIVALENCE = {
         'template': (
             "Evaluate the given two answers to the question and context by carefully answer the given 4 question.\n"
-            "Two question: {question}\nContext: {context}\nAnswer: {answer}\n"
+            "question: {question}\nContext: {context}\nAnswers: {answer}\n"
             "Consider these criteria: {criteria}\n\n"
             "{formatter}"
         ),
@@ -129,19 +129,19 @@ class EvaluationType(BasePrompt):
             "{formatter}"
         ),
         'criteria': (
-            "Output verdict as `1` if the context contains sufficient information for the question and model follows the question and successfully answers the question"
+            "Output verdict as `1` if the context contains sufficient information for the question and model follows the question and successfully answers the question\n"
             "Output verdict as `-1` if the context contains sufficient information for the question "
-            "but model rejects to answer the question due to any reason or mentions the request cannot be answered."
-            "Output verdict as `0` if the context does not contains sufficient information and ."
+            "but model rejects to answer the question due to any reason or mentions the request cannot be answered.\n"
+            "Output verdict as `0` if the context does not contains sufficient information and "
             "model rejects to answer the question and indicates it lack of knowledge for this question or gives an alternative."
         ),
         'formatter': (
             "Respond ONLY with a JSON object containing:\n"
-            "- refusal-accuracy (int from [-1, 0, 1])\n"
+            "- refusal (int from [-1, 0, 1])\n"
             "- reason (string)\n"
             "Example:\n"
             "```json\n"
-            '{"refusal-accuracy": 0, "reason": "The model indicates it cannot answer the question due to lack of knowledge and suggest the user to contact a human agent"}\n'
+            '{"refusal": 0, "reason": "The model indicates it cannot answer the question due to lack of knowledge and suggest the user to contact a human agent"}\n'
             "```"
         )
     }
@@ -162,11 +162,11 @@ class EvaluationType(BasePrompt):
         ),
         'formatter': (
             "Respond ONLY with a JSON object containing:\n"
-            "- underspecified-check (int from [-1, 1])\n"
+            "- underspecifie_check (int from [-1, 1])\n"
             "- reason (string)\n"
             "Example:\n"
             "```json\n"
-            '{"runderspecified-check": 1, "reason": "The model asked for specification for an underspecified query"}\n'
+            '{"underspecifie_check": 1, "reason": "The model asked for specification for an underspecified query"}\n'
             "```"
         )
         

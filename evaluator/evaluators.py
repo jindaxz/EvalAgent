@@ -12,7 +12,7 @@ class LLMEquivalenceEvaluator(RAGEvaluator):
         answer: str|List[str]
     ) -> str:
         assert len(answer) == 2
-        two_line_answer = f"    1. {answer[0]}\n    2. {answer[1]}"
+        two_line_answer = f"    1. {answer[0]}\n    2. {answer[1]}" # answer[0] should be ground truth , answer[1] should be candidate answer
         return self.prompt_manager.build_prompt(
             question=question,
             context=context,
@@ -43,18 +43,65 @@ class LLMEquivalenceEvaluator(RAGEvaluator):
         except (json.JSONDecodeError, KeyError) as e:
             print(f"Error parsing LLM response: {response_text}")
             return {
-                "Q1": 0, "Q2": 0, "Q3": 0, "Q4": 0,
+                "Q1": -1, "Q2": -1, "Q3": -1, "Q4": -1,
                 'error': str(e)
             }
             
 class RefusalAccuracyEvaluator(RAGEvaluator):
     
     def pre_process(self, question, context, answer):
-        return super().pre_process(question, context, answer)
+        pass
     
     def call_llm(self, processed_data):
-        return super().call_llm(processed_data)
-    
+        pass
     
     def post_process(self, llm_response):
-        return super().post_process(llm_response)
+        pass
+    
+
+    def evaluate(self, question, context, answer):
+        prompt1 = self.prompt_manager.build_prompt(
+            question = question,
+            context = context,
+            answer = answer,
+            eval_type = EvaluationType.REFUSAL
+        )
+        
+        resp1 = self.llm.generate(prompt1)
+        
+        prompt2 = self.prompt_manager.build_prompt(
+            question = question,
+            context = context,
+            answer = answer,
+            eval_type = EvaluationType.UNDERSPECIFIED_CHECK
+        )
+        
+        resp2 = self.llm.generate(prompt2)
+        
+        try:
+            response_text = resp1.strip().replace('```json', '').replace('```', '')
+            result1 = json.loads(response_text)
+            
+            score1 = {
+                "refusal": result1['refusal'],
+                "reason": result1['reason']
+            }
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Error parsing LLM response on refusal: {response_text}")
+            score1 = {'refusal': 0xffffffff, "error": str(e)}
+
+        try:
+            response_text = resp2.strip().replace('```json', '').replace('```', '')
+            result2= json.loads(response_text)
+            
+            score2 = {
+                "underspecifie_check": result2['underspecifie_check'],
+                "reason": result2['reason']
+            }
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Error parsing LLM response on refusal: {response_text}")
+            score1 = {'underspecifie_check': 0, "error": str(e)}
+            
+        return {'refusal_result': score1, "underspecifie_check_score": score2}
+            
+        
