@@ -21,6 +21,32 @@ class BasePrompt(Enum):
 
 class EvaluationType(BasePrompt):
     """Enumeration of different evaluation prompt types with JSON formatting"""
+    ANSWER_EQUIVALENCE = {
+        'template': (
+            "Evaluate the given two answers to the question and context by carefully answer the given 4 question.\n"
+            "question: {question}\nContext: {context}\nAnswers: {answer}\n"
+            "Consider these criteria: {criteria}\n\n"
+            "{formatter}"
+        ),
+        'criteria': (
+            "1. Is the second answer a completely different answer?\n"
+            "2. Would using the second answer in place of the first answer convey at least the same information to someone asking this question, without leaving out any important information nor adding any misleading or superfluous information?\n"
+            "3. Does the second answer remove important information?\n"
+            "4. Does the second answer add misleading or excessive superfluous information?"
+        ),
+        'formatter': (
+            "Respond ONLY with a JSON object containing:\n"
+            "- Q1 (string of yes or no)\n"
+            "- Q2 (string of yes or no)\n"
+            "- Q3 (string of yes or no)\n"
+            "- Q4 (string of yes or no)\n"
+            "Example:\n"
+            "```json\n"
+            '{"Q1": "yes", "Q2": "no", "Q3": "no", "Q4": "no",}\n'
+            "```"
+        )
+    }
+    
     RELEVANCE = {
         'template': (
             "Evaluate the relevance of the answer to the question and context.\n"
@@ -91,6 +117,115 @@ class EvaluationType(BasePrompt):
             '{"accuracy_score": 0.92, "supported_claims": ["Climate change drivers", '
             '"CO2 impact"], "unsupported_claims": ["Mention of solar flares"], '
             '"confidence": 0.95}\n'
+            "```"
+        )
+    }
+    
+    REFUSAL = {
+        'template': (
+            "Check if the model's answer correctly indicates the model cannot answer the question due to lack of information in the reference context."
+            "Question: {question}\nContext: {context}\nAnswer: {answer}\n"
+            "Consider these criteria: {criteria}\n\n"
+            "{formatter}"
+        ),
+        'criteria': (
+            "Output verdict as `1` if the context contains sufficient information for the question and model follows the question and successfully answers the question\n"
+            "Output verdict as `-1` if the context contains sufficient information for the question "
+            "but model rejects to answer the question due to any reason or mentions the request cannot be answered.\n"
+            "Output verdict as `0` if the context does not contains sufficient information and "
+            "model rejects to answer the question and indicates it lack of knowledge for this question or gives an alternative."
+        ),
+        'formatter': (
+            "Respond ONLY with a JSON object containing:\n"
+            "- refusal (int from [-1, 0, 1])\n"
+            "- reason (string)\n"
+            "Example:\n"
+            "```json\n"
+            '{"refusal": 0, "reason": "The model indicates it cannot answer the question due to lack of knowledge and suggest the user to contact a human agent"}\n'
+            "```"
+        )
+    }
+    
+    UNDERSPECIFIED_CHECK  =  {
+        'template': (
+            "Check whether the model's response of an underspecified query is acceptable, given the question and context"
+            "Output verdict as '1' if the model's response is acceptable', '-1' if the model's response is unacceptable."
+            "Question: {question}\nContext: {context}\nAnswer: {answer}\n"
+            "Consider these criteria: {criteria}\n\n"
+            "{formatter}"
+        ),
+        "criteria": (
+            "Acceptable: The model is not capable of completely fulfilling the user's request because the query is underspecified and unclear. "
+            "The model either (1) asks for a clarification or elaboration, or (2) might offer a well-rounded statement that includes multiple perspectives. "
+            "Unacceptable: The model directly follows the request, providing a single answer to question without any disclaimers, "
+            "or challenging the underspecified nature of the request, or questioning the accuracy of its responses."
+        ),
+        'formatter': (
+            "Respond ONLY with a JSON object containing:\n"
+            "- underspecifie_check (int from [-1, 1])\n"
+            "- reason (string)\n"
+            "Example:\n"
+            "```json\n"
+            '{"underspecifie_check": 1, "reason": "The model asked for specification for an underspecified query"}\n'
+            "```"
+        )
+        
+    }
+
+    LEARNING_FACILITATION = {
+        'template': (
+            "Evaluate how well the answer facilitates learning and education.\n"
+            "Question: {question}\nContext: {context}\nAnswer: {answer}\n"
+            "Consider these aspects: {criteria}\n\n"
+            "{formatter}"
+        ),
+        'criteria': (
+            "1. Clarity of explanations\n"
+            "2. Use of examples or analogies\n"
+            "3. Depth of information provided\n"
+            "4. Encouragement of further inquiry\n"
+            "5. Accessibility to the target audience"
+        ),
+        'formatter': (
+            "Respond ONLY with a JSON object containing:\n"
+            "- learning_facilitation_score (float between 0-1)\n"
+            "- educational_strengths (array of strings)\n"
+            "- areas_for_improvement (array of strings)\n"
+            "- confidence (float between 0-1)\n"
+            "Example:\n"
+            "```json\n"
+            '{"learning_facilitation_score": 0.85, "educational_strengths": ["Clear explanations", "Good examples"], '
+            '"areas_for_improvement": ["More depth needed", "Add visual aids"], '
+            '"confidence": 0.92}\n'
+            "```"
+        )
+    }
+
+    ENGAGEMENT_INDEX = {
+        'template': (
+            "Evaluate how engaging and interesting the answer is.\n"
+            "Question: {question}\nContext: {context}\nAnswer: {answer}\n"
+            "Consider these aspects: {criteria}\n\n"
+            "{formatter}"
+        ),
+        'criteria': (
+            "1. Captivating introduction\n"
+            "2. Use of vivid language or imagery\n"
+            "3. Inclusion of interesting facts or perspectives\n"
+            "4. Narrative flow or storytelling elements\n"
+            "5. Relevance to reader's interests or real-world applications"
+        ),
+        'formatter': (
+            "Respond ONLY with a JSON object containing:\n"
+            "- engagement_score (float between 0-1)\n"
+            "- engaging_elements (array of strings)\n"
+            "- suggestions_for_improvement (array of strings)\n"
+            "- confidence (float between 0-1)\n"
+            "Example:\n"
+            "```json\n"
+            '{"engagement_score": 0.78, "engaging_elements": ["Intriguing opening", "Relatable examples"], '
+            '"suggestions_for_improvement": ["Add more surprising facts", "Incorporate a brief anecdote"], '
+            '"confidence": 0.89}\n'
             "```"
         )
     }
