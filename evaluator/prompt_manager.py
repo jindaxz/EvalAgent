@@ -235,13 +235,12 @@ class PromptManager:
     
     def __init__(self, default_type: EvaluationType = EvaluationType.RELEVANCE):
         self.default_type = default_type
-        self.custom_prompts: Dict[str, Dict[str, str]] = {}
     
     def build_prompt(
         self,
-        question: str,
-        context: str,
         answer: str,
+        question: str = "",
+        context: str = "",
         eval_type: EvaluationType = None,
         **kwargs: Any
     ) -> str:

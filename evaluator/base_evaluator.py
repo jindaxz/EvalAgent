@@ -18,7 +18,7 @@ class RAGEvaluator(ABC):
         self.prompt_manager = prompt_manager
     
     @abstractmethod
-    def pre_process(self, question: str|List[str], context: str|List[str], answer: str|List[str]) -> Any:
+    def pre_process(self, question: str|List[str], context: str|List[str], answer: str|List[str], **kwargs) -> Any:
         """
         Prepare and format the evaluation input.
         
@@ -26,6 +26,7 @@ class RAGEvaluator(ABC):
             question: User question/query
             context: Retrieved context used for generation
             answer: Generated answer to evaluate
+            kwargs: Additional template parameters (golded_answer)
             
         Returns:
             Processed data ready for LLM evaluation
@@ -58,7 +59,7 @@ class RAGEvaluator(ABC):
         """
         pass
     
-    def evaluate(self, question: str, context: str, answer: str) -> Dict[str, float]:
+    def evaluate(self, answer: str|List[str], question: str|List[str] = None, context: str|List[str] = None, **kwargs ) -> Dict[str, float]:
         """
         Main evaluation workflow.
         
@@ -66,10 +67,11 @@ class RAGEvaluator(ABC):
             question: User question/query
             context: Retrieved context used for generation
             answer: Generated answer to evaluate
+            kwargs: Additional template parameters (golded_answer)
             
         Returns:
             Dictionary of evaluation metrics and scores
         """
-        processed_data = self.pre_process(question, context, answer)
+        processed_data = self.pre_process(question, context, answer, **kwargs)
         llm_response = self.call_llm(processed_data)
         return self.post_process(llm_response)
