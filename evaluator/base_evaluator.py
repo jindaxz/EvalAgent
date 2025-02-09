@@ -59,7 +59,7 @@ class RAGEvaluator(ABC):
         """
         pass
     
-    def evaluate(self, answer: str, question: str = "", context: str = "",  **kwargs) -> Dict[str, float]:
+    def evaluate(self, answer: str|List[str], question: str|List[str] = None, context: str|List[str] = None, **kwargs ) -> Dict[str, float]:
         """
         Main evaluation workflow.
         
