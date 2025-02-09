@@ -171,7 +171,64 @@ class EvaluationType(BasePrompt):
         )
         
     }
-    
+
+    LEARNING_FACILITATION = {
+        'template': (
+            "Evaluate how well the answer facilitates learning and education.\n"
+            "Question: {question}\nContext: {context}\nAnswer: {answer}\n"
+            "Consider these aspects: {criteria}\n\n"
+            "{formatter}"
+        ),
+        'criteria': (
+            "1. Clarity of explanations\n"
+            "2. Use of examples or analogies\n"
+            "3. Depth of information provided\n"
+            "4. Encouragement of further inquiry\n"
+            "5. Accessibility to the target audience"
+        ),
+        'formatter': (
+            "Respond ONLY with a JSON object containing:\n"
+            "- learning_facilitation_score (float between 0-1)\n"
+            "- educational_strengths (array of strings)\n"
+            "- areas_for_improvement (array of strings)\n"
+            "- confidence (float between 0-1)\n"
+            "Example:\n"
+            "```json\n"
+            '{"learning_facilitation_score": 0.85, "educational_strengths": ["Clear explanations", "Good examples"], '
+            '"areas_for_improvement": ["More depth needed", "Add visual aids"], '
+            '"confidence": 0.92}\n'
+            "```"
+        )
+    }
+
+    ENGAGEMENT_INDEX = {
+        'template': (
+            "Evaluate how engaging and interesting the answer is.\n"
+            "Question: {question}\nContext: {context}\nAnswer: {answer}\n"
+            "Consider these aspects: {criteria}\n\n"
+            "{formatter}"
+        ),
+        'criteria': (
+            "1. Captivating introduction\n"
+            "2. Use of vivid language or imagery\n"
+            "3. Inclusion of interesting facts or perspectives\n"
+            "4. Narrative flow or storytelling elements\n"
+            "5. Relevance to reader's interests or real-world applications"
+        ),
+        'formatter': (
+            "Respond ONLY with a JSON object containing:\n"
+            "- engagement_score (float between 0-1)\n"
+            "- engaging_elements (array of strings)\n"
+            "- suggestions_for_improvement (array of strings)\n"
+            "- confidence (float between 0-1)\n"
+            "Example:\n"
+            "```json\n"
+            '{"engagement_score": 0.78, "engaging_elements": ["Intriguing opening", "Relatable examples"], '
+            '"suggestions_for_improvement": ["Add more surprising facts", "Incorporate a brief anecdote"], '
+            '"confidence": 0.89}\n'
+            "```"
+        )
+    }
 
 class PromptManager:
     """Manages prompt construction with JSON output formatting"""

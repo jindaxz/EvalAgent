@@ -1,5 +1,6 @@
+from __future__ import annotations # for pervious python version e.g. 3.9
 import json
-from typing import Dict, List
+from typing import List, Dict, Union
 from evaluator.base_evaluator import RAGEvaluator
 from evaluator.prompt_manager import EvaluationType
 
@@ -105,3 +106,93 @@ class RefusalAccuracyEvaluator(RAGEvaluator):
         return {'refusal_result': score1, "underspecifie_check_score": score2}
             
         
+
+class LearningFacilitationEvaluator(RAGEvaluator):
+    def pre_process(
+        self,
+        question: str|List[str],
+        context: str|List[str],
+        answer: str|List[str]
+    ) -> str:
+        return self.prompt_manager.build_prompt(
+            question=question,
+            context=context,
+            answer=answer,
+            eval_type=EvaluationType.LEARNING_FACILITATION
+        )
+        
+    def call_llm(self, processed_data: str) -> str:
+        # Execute LLM call with constructed prompt
+        return self.llm.generate(processed_data)
+    
+    def post_process(self, llm_response: str) -> Dict[str, float]:
+        """Parse JSON response into scores dictionary"""
+        try:
+            print(f"Raw LLM response: {llm_response}")
+            response_text = llm_response.strip().replace('```json', '').replace('```', '')
+            result = json.loads(response_text)
+            
+            scores = {
+                "learning_facilitation_score": result['learning_facilitation_score'],
+                "educational_strengths": result['educational_strengths'],
+                "areas_for_improvement": result['areas_for_improvement'],
+                "confidence": result['confidence']
+            }
+            
+            return scores
+            
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Error parsing LLM response: {response_text}")
+            return {
+                "learning_facilitation_score": -1,
+                "educational_strengths": [],
+                "areas_for_improvement": [],
+                "confidence": -1,
+                'error': str(e)
+            }
+
+
+class EngagementEvaluator(RAGEvaluator):
+    def pre_process(
+        self,
+        question: Union[str, List[str]],
+        context: Union[str, List[str]],
+        answer: Union[str, List[str]]
+    ) -> str:
+        return self.prompt_manager.build_prompt(
+            question=question,
+            context=context,
+            answer=answer,
+            eval_type=EvaluationType.ENGAGEMENT_INDEX
+        )
+        
+    def call_llm(self, processed_data: str) -> str:
+        # Execute LLM call with constructed prompt
+        return self.llm.generate(processed_data)
+    
+    def post_process(self, llm_response: str) -> Dict[str, Union[float, List[str]]]:
+        """Parse JSON response into scores dictionary"""
+        try:
+            print(f"Raw LLM response: {llm_response}")
+            # Clean response and parse JSON
+            response_text = llm_response.strip().replace('```json', '').replace('```', '')
+            result = json.loads(response_text)
+            
+            scores = {
+                "engagement_score": result.get('engagement_score', -1),
+                "engaging_elements": result.get('engaging_elements', []),
+                "suggestions_for_improvement": result.get('suggestions_for_improvement', []),
+                "confidence": result.get('confidence', -1)
+            }
+            
+            return scores
+            
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Error parsing LLM response: {llm_response}")
+            return {
+                "engagement_score": -1,
+                "engaging_elements": [],
+                "suggestions_for_improvement": [],
+                "confidence": -1,
+                'error': str(e)
+            }
