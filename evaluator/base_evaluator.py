@@ -18,7 +18,7 @@ class RAGEvaluator(ABC):
         self.prompt_manager = prompt_manager
     
     @abstractmethod
-    def pre_process(self, question: str|List[str], context: str|List[str], answer: str|List[str], **kwargs: Any ) -> Any:
+    def pre_process(self, question: str|List[str], context: str|List[str], answer: str|List[str], **kwargs) -> Any:
         """
         Prepare and format the evaluation input.
         
