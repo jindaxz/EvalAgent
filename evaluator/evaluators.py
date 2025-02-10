@@ -220,7 +220,6 @@ class FactualCorrectnessEvaluator(RAGEvaluator):
             # Clean response and parse JSON
             response_text = llm_response.strip().replace('```json', '').replace('```', '')
             result = json.loads(response_text)
-            print(result)
             
             scores = {
                 "TP": result['TP'],
