@@ -230,6 +230,47 @@ class EvaluationType(BasePrompt):
         )
     }
 
+    CONTEXT_RELEVANCE = {
+        'template': (
+            "Evaluate the context relevance of the retrieved context compared to the input question.\n"
+            "Input Question: {question}\n"
+            "Retrieved Context: {context}\n"
+            "Consider these criteria: {criteria}\n\n"
+            "{formatter}"
+        ),
+        'criteria': (
+            "1. Identify key information in the input question that requires context for a relevant answer.\n"
+            "2. Classify context segments as:\n"
+            "   - Relevant (R): Directly supports answering the input question.\n"
+            "   - Irrelevant (IR): Does not contribute to answering the input question.\n"
+            "3. Determine if the retrieved context fully covers all necessary information to answer the question.\n"
+            "4. Focus on whether the retrieved context adds meaningful, related details to the question."
+        ),
+        'formatter': (
+            "Respond ONLY with a JSON object containing:\n"
+            "- extracted_context (object with 'relevant' and 'irrelevant' arrays of key context segments)\n"
+            "- R (integer): Number of relevant context segments\n"
+            "- IR (integer): Number of irrelevant context segments\n"
+            "- fully_answerable (boolean): true if the question can be fully answered using the provided context, false otherwise\n"
+            "- reasons (array of 3 short strings explaining the classification and the fully_answerable status)\n"
+            "Example:\n"
+            "```json\n"
+            '{\n'
+            '  "extracted_context": {\n'
+            '    "relevant": ["The Eiffel Tower is a landmark in Paris", "It attracts millions of visitors annually"],\n'
+            '    "irrelevant": ["The Leaning Tower of Pisa is in Italy", "Mount Everest is the tallest mountain"]\n'
+            '  },\n'
+            '  "R": 2,\n'
+            '  "IR": 2,\n'
+            '  "fully_answerable": true,\n'
+            '  "reasons": ["Relevant facts directly describe the Eiffel Tower", "Irrelevant facts mention unrelated landmarks", "Sufficient context provided to fully answer the question"]\n'
+            '}\n'
+            "```"
+        )
+    }
+
+
+
 class PromptManager:
     """Manages prompt construction with JSON output formatting"""
     
@@ -238,11 +279,11 @@ class PromptManager:
     
     def build_prompt(
         self,
-        answer: str,
-        question: str = "",
-        context: str = "",
+        answer: str = None,
+        question: str = None,
+        context: str = None,
         eval_type: EvaluationType = None,
-        **kwargs: Any
+        **kwargs
     ) -> str:
         """
         Construct an evaluation prompt with JSON formatting instructions
