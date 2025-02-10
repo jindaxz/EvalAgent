@@ -196,3 +196,43 @@ class EngagementEvaluator(RAGEvaluator):
                 "confidence": -1,
                 'error': str(e)
             }
+        
+class FactualCorrectnessEvaluator(RAGEvaluator):
+    def pre_process(
+        self, question: str|List[str], context: str|List[str], answer: str|List[str], **kwargs
+    ) -> str:
+        if "golden_answer" not in kwargs:
+            raise KeyError("Missing required key: golden_answer")
+        golden_answer = kwargs.get("golden_answer")
+        return self.prompt_manager.build_prompt(
+            answer=answer,
+            eval_type=EvaluationType.FACTUAL_CORRECTNESS,
+            golden_answer=golden_answer
+        )
+        
+    def call_llm(self, processed_data: str) -> str:
+        # Execute LLM call with constructed prompt
+        return self.llm.generate(processed_data)
+    
+    def post_process(self, llm_response: str) -> Dict[str, float]:
+        """Parse JSON response into scores dictionary"""
+        try:
+            # Clean response and parse JSON
+            response_text = llm_response.strip().replace('```json', '').replace('```', '')
+            result = json.loads(response_text)
+            
+            scores = {
+                "TP": result['TP'],
+                "FP": result['FP'],
+                "FN": result['FN'],
+                "F1_score": 0 if (result['TP'] + result['FP'] + result['FN']) == 0 else result['TP'] / (result['TP'] + result['FP'] + result['FN']),
+            }
+            
+            return scores
+            
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Error parsing LLM response: {response_text}")
+            return {
+                "TP": -1, "FP": -1, "FN": -1, "F1_SCORE": -1,
+                'error': str(e)
+            }
