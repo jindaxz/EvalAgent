@@ -235,6 +235,10 @@ class ContextRelevanceEvaluator(RAGEvaluator):
           
 
 class FactualCorrectnessEvaluator(RAGEvaluator):
+    """
+    From https://arxiv.org/abs/2407.12873, Use their definition of Factual Correctness to build prompt.
+    This method evaluates factual correctness of the generated answer compared to the golden (ground truth) answer.
+    """
     def pre_process(
         self, question: str|List[str], context: str|List[str], answer: str|List[str], **kwargs
     ) -> str:
