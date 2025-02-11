@@ -4,21 +4,29 @@ from typing import List, Dict, Union
 from evaluator.base_evaluator import RAGEvaluator
 from evaluator.prompt_manager import EvaluationType
 
-
-class LLMEquivalenceEvaluator(RAGEvaluator):
+# TODO: add AnswerEquivalenceEvaluatorWithBert
+class AnswerEquivalenceEvaluator(RAGEvaluator):
+    """
+    From https://arxiv.org/abs/2202.07654, Used their definition of answer equivalence to build prompt.
+    This method evaluates if the generated answer is equivalent to the reference answer.
+    """
     def pre_process(
         self,
         question: str|List[str],
         context: str|List[str],
-        answer: str|List[str]
+        answer: str|List[str],
+        **kwargs,
     ) -> str:
-        assert len(answer) == 2
-        two_line_answer = f"    1. {answer[0]}\n    2. {answer[1]}" # answer[0] should be ground truth , answer[1] should be candidate answer
+        assert "reference_answer" in kwargs, "Missing required input: reference_answer"
+        reference_answer = kwargs.get("reference_answer")
+        assert len(reference_answer) > 0, "reference_answer is empty"
+        
         return self.prompt_manager.build_prompt(
             question=question,
             context=context,
-            answer=two_line_answer,
-            eval_type=EvaluationType.ANSWER_EQUIVALENCE
+            answer=answer,
+            eval_type=EvaluationType.ANSWER_EQUIVALENCE,
+            reference_answer = reference_answer
         )
         
     def call_llm(self, processed_data: str) -> str:
@@ -32,19 +40,24 @@ class LLMEquivalenceEvaluator(RAGEvaluator):
             response_text = llm_response.strip().replace('```json', '').replace('```', '')
             result = json.loads(response_text)
             
+            def get_score(result):
+                if result['Q1'] == 'no':
+                    return 1
+                elif result['Q2'] == 'yes':
+                    return 1
+                return 0
+            
             scores = {
-                "Q1": 1 if result['Q1'] == 'yes' else 0,
-                "Q2": 1 if result['Q2'] == 'yes' else 0,
-                "Q3": 1 if result['Q3'] == 'yes' else 0,
-                "Q4": 1 if result['Q4'] == 'yes' else 0,
+                "equivalence" : get_score(result),
+                "raw_output": result
             }
             
             return scores
             
         except (json.JSONDecodeError, KeyError) as e:
-            print(f"Error parsing LLM response: {response_text}")
             return {
-                "Q1": -1, "Q2": -1, "Q3": -1, "Q4": -1,
+                "equivalence": -1,
+                "raw_output": response_text,
                 'error': str(e)
             }
             

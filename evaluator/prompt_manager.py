@@ -23,8 +23,10 @@ class EvaluationType(BasePrompt):
     """Enumeration of different evaluation prompt types with JSON formatting"""
     ANSWER_EQUIVALENCE = {
         'template': (
-            "Evaluate the given two answers to the question and context by carefully answer the given 4 question.\n"
-            "question: {question}\nContext: {context}\nAnswers: {answer}\n"
+            "Evaluate the given two answers to the question and context by carefully answer the given 4 questions, and give a brief reason on you decision.\n"
+            "question: {question}\nContext: {context}\n"
+            "first answer: {reference_answer}\n"
+            "second answer: {answer}\n"
             "Consider these criteria: {criteria}\n\n"
             "{formatter}"
         ),
@@ -40,9 +42,10 @@ class EvaluationType(BasePrompt):
             "- Q2 (string of yes or no)\n"
             "- Q3 (string of yes or no)\n"
             "- Q4 (string of yes or no)\n"
+            "- reasons (string)\n"
             "Example:\n"
             "```json\n"
-            '{"Q1": "yes", "Q2": "no", "Q3": "no", "Q4": "no",}\n'
+            '{"Q1": "yes", "Q2": "no", "Q3": "no", "Q4": "no", "reasons": "the second answer contradict with the first answer"}\n'
             "```"
         )
     }
