@@ -217,10 +217,9 @@ class ContextRelevanceEvaluator(RAGEvaluator):
         try:
             # Clean response and parse JSON
             response_text = llm_response.strip().replace('```json', '').replace('```', '')
-            print(response_text)
             result = json.loads(response_text)
             score = {
-                "fully_answerable" : 1 if result['fully_answerable'] == 'true' else 0
+                "relevance_score" : result['relevance_score']
             }
             return score
         except (json.JSONDecodeError, KeyError) as e:

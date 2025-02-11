@@ -245,15 +245,16 @@ class EvaluationType(BasePrompt):
             "   - Relevant (R): Directly supports answering the input question.\n"
             "   - Irrelevant (IR): Does not contribute to answering the input question.\n"
             "3. Determine if the retrieved context fully covers all necessary information to answer the question.\n"
-            "4. Focus on whether the retrieved context adds meaningful, related details to the question."
+            "4. Focus on whether the retrieved context adds meaningful, related details to the question.\n"
+            "5. Assign a relevance score between 0 and 1 indicating the degree of relevance, where 1 means highly relevant and 0 means completely irrelevant."
         ),
         'formatter': (
             "Respond ONLY with a JSON object containing:\n"
             "- extracted_context (object with 'relevant' and 'irrelevant' arrays of key context segments)\n"
             "- R (integer): Number of relevant context segments\n"
             "- IR (integer): Number of irrelevant context segments\n"
-            "- fully_answerable (boolean): true if the question can be fully answered using the provided context, false otherwise\n"
-            "- reasons (array of 3 short strings explaining the classification and the fully_answerable status)\n"
+            "- relevance_score (float): A score between 0 and 1 indicating the degree of relevance\n"
+            "- reasons (array of 3 short strings explaining the classification and the relevance score)\n"
             "Example:\n"
             "```json\n"
             '{\n'
@@ -263,8 +264,8 @@ class EvaluationType(BasePrompt):
             '  },\n'
             '  "R": 2,\n'
             '  "IR": 2,\n'
-            '  "fully_answerable": true,\n'
-            '  "reasons": ["Relevant facts directly describe the Eiffel Tower", "Irrelevant facts mention unrelated landmarks", "Sufficient context provided to fully answer the question"]\n'
+            '  "relevance_score": 0.75,\n'
+            '  "reasons": ["Relevant facts directly describe the Eiffel Tower", "Irrelevant facts mention unrelated landmarks", "High relevance due to sufficient context provided"]\n'
             '}\n'
             "```"
         )
