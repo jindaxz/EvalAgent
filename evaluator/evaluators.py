@@ -17,16 +17,16 @@ class AnswerEquivalenceEvaluator(RAGEvaluator):
         answer: str|List[str],
         **kwargs,
     ) -> str:
-        assert "reference_answer" in kwargs, "Missing required input: reference_answer"
-        reference_answer = kwargs.get("reference_answer")
-        assert len(reference_answer) > 0, "reference_answer is empty"
+        assert "golden_answer" in kwargs, "Missing required input: golden_answer"
+        golden_answer = kwargs.get("golden_answer")
+        assert len(golden_answer) > 0, "golden_answer is empty"
         
         return self.prompt_manager.build_prompt(
             question=question,
             context=context,
             answer=answer,
             eval_type=EvaluationType.ANSWER_EQUIVALENCE,
-            reference_answer = reference_answer
+            golden_answer = golden_answer
         )
         
     def call_llm(self, processed_data: str) -> str:

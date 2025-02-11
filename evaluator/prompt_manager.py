@@ -25,7 +25,7 @@ class EvaluationType(BasePrompt):
         'template': (
             "Evaluate the given two answers to the question and context by carefully answer the given 4 questions, and give a brief reason on you decision.\n"
             "question: {question}\nContext: {context}\n"
-            "first answer: {reference_answer}\n"
+            "first answer: {golden_answer}\n"
             "second answer: {answer}\n"
             "Consider these criteria: {criteria}\n\n"
             "{formatter}"
