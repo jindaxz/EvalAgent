@@ -247,16 +247,16 @@ class KeyPointEvaluator(RAGEvaluator):
     def pre_process(self, question, context, answer, **kwargs):
         if "key_points" not in kwargs:
             raise KeyError("Missing required input: key_points")
-        key_points = kwargs.get("golden_answer")
+        key_points = kwargs.get("key_points")
         
-        if not isinstance(key_points, List):
+        if not isinstance(key_points, list):
             raise ValueError("key_points is type of List[str]")
         
         if len(key_points) == 0:
             raise ValueError("key_points is an empty List, which is invalid")
         
         self.num_key_points = len(key_points)
-        formatted_key_points = "\n".join([f"{i + 1}. {kp}" for i, kp in enumerate(key_points)])
+        formatted_key_points = "\n".join(key_points)
         
         return self.prompt_manager.build_prompt(
             question = question,

@@ -238,7 +238,7 @@ class EvaluationType(BasePrompt):
             "lists of key point indices that are relevant and complete, irrelevant, or wrong respectively"
             "(Note: EVERY key_point need to be assign to A category):"
             "Question: {question}\n\nAnswer: {answer}\n"
-            "Key_Points: {key_point}\n"
+            "Key_Points: {key_points}\n"
             "Consider these criteria: {criteria}\n\n and give some brief reasoning on why you make such decision"
             "{formatter}"
         ),
