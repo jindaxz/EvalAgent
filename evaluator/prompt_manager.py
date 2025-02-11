@@ -229,6 +229,38 @@ class EvaluationType(BasePrompt):
             "```"
         )
     }
+    
+    KEY_POINT = {
+        'template' : (
+            "In this task, you will receive a question, a generated answer, and key points from a standard answer. "
+            "Please categorize each key point based on the generated answer into one of the following categories: complete_ids, irrelevant_ids, or hallucinate_ids. "
+            "Return the results in the given JSON format, where complete_ids, irrelevant_ids, hallucinate_ids are "
+            "lists of key point indices that are relevant and complete, irrelevant, or wrong respectively"
+            "(Note: EVERY key_point need to be assign to A category):"
+            "Question: {question}\n\nAnswer: {answer}\n"
+            "Key_Points: {key_points}\n"
+            "Consider these criteria: {criteria}\n\n and give some brief reasoning on why you make such decision"
+            "{formatter}"
+        ),
+        "criteria" : (
+            "- complete_ids: Indices of key points that are relevant and consistent with the standard answer."
+            "- irrelevant_ids: Indices of key points that are not covered or mentioned in the generated answer."
+            "- hallucinate_ids: Indices of key points that are incorrectly addressed or contain significant errors in the generated answer."
+        ),
+        "formatter" : (
+            "Respond ONLY with a JSON object containing:\n"
+            "- complete_ids (list of int)\n"
+            "- irrelevant_ids (list of int)\n"
+            "- hallucinate_ids (list of int)\n"
+            "- reasons (string)\n"
+            "Example:\n"
+            "```json\n"
+            '{"complete_ids": [1, 2], "irrelevant_ids": [3, 4, 5], "hallucinate_ids": [6]'
+            '"reasons": "generated answer covers the the deadline mentioned in key_point 1 and product name in key_point2.'
+            'It does not cover key_point 3, 4, 5 and it is incorrect about the company named mentioned in key_point 6"}'
+            "```" 
+        )
+    }
 
 
     CONTEXT_RELEVANCE = {
