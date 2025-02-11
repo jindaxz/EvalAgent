@@ -199,6 +199,10 @@ class EngagementEvaluator(RAGEvaluator):
         
 
 class ContextRelevanceEvaluator(RAGEvaluator):
+    """
+    From https://arxiv.org/abs/2501.08208, Use their definition of context relevance to build prompt.
+    This method evaluates the context relevance of the retrieved context compared to the input question.
+    """
     def pre_process(
         self, question: str|List[str], context: str|List[str], answer: str|List[str], **kwargs
     ) -> str:
