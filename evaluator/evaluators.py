@@ -236,3 +236,60 @@ class FactualCorrectnessEvaluator(RAGEvaluator):
                 "TP": -1, "FP": -1, "FN": -1, "F1_SCORE": -1,
                 'error': str(e)
             }
+            
+class KeyPointEvaluator(RAGEvaluator):
+    """
+    From https://arxiv.org/abs/2408.01262, using extracted key points generate from ground truth answer to check with generated answer,
+    using the categorized key_points count to calculate generation scores. 
+    It can provide completeness, hallucination and irrelevance score. 
+    """
+    num_key_points = 0
+    def pre_process(self, question, context, answer, **kwargs):
+        if "key_points" not in kwargs:
+            raise KeyError("Missing required input: key_points")
+        key_points = kwargs.get("key_points")
+        
+        if not isinstance(key_points, list):
+            raise ValueError("key_points is type of List[str]")
+        
+        if len(key_points) == 0:
+            raise ValueError("key_points is an empty List, which is invalid")
+        
+        self.num_key_points = len(key_points)
+        formatted_key_points = "\n".join(key_points)
+        
+        return self.prompt_manager.build_prompt(
+            question = question,
+            answer = answer,
+            eval_type = EvaluationType.KEY_POINT,
+            key_points = formatted_key_points,
+        )
+        
+    def call_llm(self, processed_data):
+        return self.llm.generate(processed_data)
+    
+    def post_process(self, llm_response):
+        try:
+            # Clean response and parse JSON
+            response_text = llm_response.strip().replace('```json', '').replace('```', '')
+            result = json.loads(response_text)
+            
+            scores = {
+                "completeness_score": len(result['complete_ids']) / self.num_key_points,
+                "irrelevant_score": len(result['irrelevant_ids']) / self.num_key_points,
+                "hallucination_score": len(result['hallucinate_ids']) / self.num_key_points,
+                "raw_output" : result
+            }
+            
+            return scores
+            
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Error parsing LLM response: {llm_response}")
+            return {
+                "completeness_score": -1,
+                "irrelevant_score": -1,
+                "hallucination_score": -1,
+                "raw_output" : response_text,
+                "error": str(e),
+            }
+        

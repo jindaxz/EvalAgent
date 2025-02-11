@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "My project description"
 authors = ["Your Name <you@example.com>"]
 readme = "README.md"
-packages = [{include = "RAG-LLM-Metric"}]
+packages = [{include = "evaluator"}]
 
 [tool.poetry.dependencies]
 python = "^3.8"
@@ -13,6 +13,13 @@ requests = "^2.31.0"
 datasets = "^2.16.1"
 python-dotenv = "^1.0.0"
 
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.5"
+
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[virtualenvs]
+create = true
+in-project = true
