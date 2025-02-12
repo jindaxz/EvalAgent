@@ -210,7 +210,48 @@ class EngagementEvaluator(RAGEvaluator):
                 'error': str(e)
             }
         
+
+class ContextRelevanceEvaluator(RAGEvaluator):
+    """
+    From https://arxiv.org/abs/2501.08208, Use their definition of context relevance to build prompt.
+    This method evaluates the context relevance of the retrieved context compared to the input question.
+    """
+    def pre_process(
+        self, question: str|List[str], context: str|List[str], answer: str|List[str], **kwargs
+    ) -> str:
+        return self.prompt_manager.build_prompt(
+            question=question,
+            context=context,
+            eval_type=EvaluationType.CONTEXT_RELEVANCE
+        )
+        
+    def call_llm(self, processed_data: str) -> str:
+        # Execute LLM call with constructed prompt
+        return self.llm.generate(processed_data)
+    
+    def post_process(self, llm_response: str) -> Dict[str, float]:
+        """Parse JSON response into scores dictionary"""
+        try:
+            # Clean response and parse JSON
+            response_text = llm_response.strip().replace('```json', '').replace('```', '')
+            result = json.loads(response_text)
+            score = {
+                "relevance_score" : result['relevance_score']
+            }
+            return score
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Error parsing LLM response: {response_text}")
+            return {
+                "fully_answerable": -1,
+                'error': str(e)
+            }
+          
+
 class FactualCorrectnessEvaluator(RAGEvaluator):
+    """
+    From https://arxiv.org/abs/2407.12873, Use their definition of Factual Correctness to build prompt.
+    This method evaluates factual correctness of the generated answer compared to the golden (ground truth) answer.
+    """
     def pre_process(
         self, question: str|List[str], context: str|List[str], answer: str|List[str], **kwargs
     ) -> str:
@@ -242,7 +283,6 @@ class FactualCorrectnessEvaluator(RAGEvaluator):
             }
             
             return scores
-            
         except (json.JSONDecodeError, KeyError) as e:
             print(f"Error parsing LLM response: {response_text}")
             return {

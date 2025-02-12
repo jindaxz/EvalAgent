@@ -265,11 +265,53 @@ class EvaluationType(BasePrompt):
         )
     }
 
+
+    CONTEXT_RELEVANCE = {
+        'template': (
+            "Evaluate the context relevance of the retrieved context compared to the input question.\n"
+            "Input Question: {question}\n"
+            "Retrieved Context: {context}\n"
+            "Consider these criteria: {criteria}\n\n"
+            "{formatter}"
+        ),
+        'criteria': (
+            "1. Identify key information in the input question that requires context for a relevant answer.\n"
+            "2. Classify context segments as:\n"
+            "   - Relevant (R): Directly supports answering the input question.\n"
+            "   - Irrelevant (IR): Does not contribute to answering the input question.\n"
+            "3. Determine if the retrieved context fully covers all necessary information to answer the question.\n"
+            "4. Focus on whether the retrieved context adds meaningful, related details to the question.\n"
+            "5. Assign a relevance score between 0 and 1 indicating the degree of relevance, where 1 means highly relevant and 0 means completely irrelevant."
+        ),
+        'formatter': (
+            "Respond ONLY with a JSON object containing:\n"
+            "- extracted_context (object with 'relevant' and 'irrelevant' arrays of key context segments)\n"
+            "- R (integer): Number of relevant context segments\n"
+            "- IR (integer): Number of irrelevant context segments\n"
+            "- relevance_score (float): A score between 0 and 1 indicating the degree of relevance\n"
+            "- reasons (array of 3 short strings explaining the classification and the relevance score)\n"
+            "Example:\n"
+            "```json\n"
+            '{\n'
+            '  "extracted_context": {\n'
+            '    "relevant": ["The Eiffel Tower is a landmark in Paris", "It attracts millions of visitors annually"],\n'
+            '    "irrelevant": ["The Leaning Tower of Pisa is in Italy", "Mount Everest is the tallest mountain"]\n'
+            '  },\n'
+            '  "R": 2,\n'
+            '  "IR": 2,\n'
+            '  "relevance_score": 0.75,\n'
+            '  "reasons": ["Relevant facts directly describe the Eiffel Tower", "Irrelevant facts mention unrelated landmarks", "High relevance due to sufficient context provided"]\n'
+            '}\n'
+            "```"
+        )
+    }
+    
     FACTUAL_CORRECTNESS = {
         'template': (
             "Evaluate the factual correctness of the generated answer compared to the golden (ground truth) answer.\n"
             "Golden Answer: {golden_answer}\n"
             "Generated Answer: {answer}\n"
+
             "Consider these criteria: {criteria}\n\n"
             "{formatter}"
         ),
@@ -304,6 +346,7 @@ class EvaluationType(BasePrompt):
         )
     }
 
+
 class PromptManager:
     """Manages prompt construction with JSON output formatting"""
     
@@ -312,11 +355,11 @@ class PromptManager:
     
     def build_prompt(
         self,
-        answer: str,
-        question: str = "",
-        context: str = "",
+        answer: str = None,
+        question: str = None,
+        context: str = None,
         eval_type: EvaluationType = None,
-        **kwargs: Any
+        **kwargs
     ) -> str:
         """
         Construct an evaluation prompt with JSON formatting instructions
