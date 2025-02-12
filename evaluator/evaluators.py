@@ -442,3 +442,39 @@ class AdherenceFaithfulnessEvaluator(RAGEvaluator):
                 "reasons": [],
                 "error": str(e)
             }
+
+
+
+class ContextUtilizationEvaluator(RAGEvaluator):
+    def pre_process(self, question, context, answer):
+        return self.prompt_manager.build_prompt(
+            question=question,
+            answer=answer,
+            eval_type=EvaluationType.CONTEXT_UTILIZATION,
+            context=context
+        ), context
+
+    def call_llm(self, processed_data):
+        for_prompt, context = processed_data
+        return self.llm.generate(for_prompt), context
+
+    def post_process(self, backed_data):
+        try:
+            llm_response, context = backed_data
+            print(f"Raw LLM response: {llm_response}")
+            response_text = llm_response.strip().replace('```json', '').replace('```', '')
+            result = json.loads(response_text)
+
+            if context is None:
+                context = []
+            print(f"Context: {context}")
+            relevant_context = result.get("relevant_context", [])
+            # irrelevant_context = result.get("irrelevant_context", [])
+
+            total_context = len(context)
+            relevant_count = len(relevant_context)
+            context_utilization_score = relevant_count / total_context if total_context > 0 else 0
+            return context_utilization_score
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Error parsing LLM response: {llm_response}")
+            return {"error": str(e)}
