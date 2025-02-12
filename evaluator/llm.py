@@ -28,7 +28,6 @@ class LocalDeepSeekR1(LLMClient):
 
     def __init__(self,
                  model: str = "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
-                 system_message: str = "You are a helpful and harmless assistant. You should think step-by-step.",
                  base_url = "http://127.0.0.1:30000/v1",
                  **kwargs):
         api_key = os.getenv("DEEPSEEK_API_KEY")
@@ -37,7 +36,6 @@ class LocalDeepSeekR1(LLMClient):
             
         self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.model = model
-        self.system_message = system_message
         self.params = {
             "temperature": 0.6,
             "max_tokens": 32000,
