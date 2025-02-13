@@ -399,9 +399,14 @@ class EvaluationType(BasePrompt):
             "Respond ONLY with a JSON object containing:\n"
             "- relevant_context (array of strings)\n"
             "- irrelevant_context (array of strings)\n"
+            "- reason (string explaining why the documents were classified this way)\n"
             "Example:\n"
             "```json\n"
-            '{"relevant_context": ["doc1", "doc3"], "irrelevant_context": ["doc2", "doc4"]}\n'
+            "{\n"
+            '  "relevant_context": ["doc1", "doc3"],\n'
+            '  "irrelevant_context": ["doc2", "doc4"],\n'
+            '  "reason": "doc1 and doc3 contain key facts from the answer, while doc2 and doc4 are unrelated."\n'
+            "}\n"
             "```"
         )
     }
