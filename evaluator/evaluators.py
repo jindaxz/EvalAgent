@@ -345,4 +345,53 @@ class KeyPointEvaluator(RAGEvaluator):
                 "raw_output" : response_text,
                 "error": str(e),
             }
-        
+
+
+class AdherenceFaithfulnessEvaluator(RAGEvaluator):
+    """
+    Uses an LLM to verify that all parts of the generated answer are grounded in the provided context.
+    Returns a faithfulness_score between 0 and 1, plus any unfaithful (hallucinated) segments.
+    Related paper:ASTRID - An Automated and Scalable TRIaD for the Evaluation of RAG-based Clinical Question Answering Systems,
+    https://arxiv.org/abs/2501.08208 
+    """
+
+    def pre_process(
+        self,
+        question: str | List[str],
+        context: str | List[str],
+        answer: str | List[str],
+        **kwargs
+    ) -> str:
+  
+        return self.prompt_manager.build_prompt(
+            question=question,
+            context=context,
+            answer=answer,
+            eval_type=EvaluationType.ADHERENCE_FAITHFULNESS
+        )
+
+    def call_llm(self, processed_data: str) -> str:
+        """
+        Invoke the LLM with the processed prompt and return its raw text response.
+        """
+        return self.llm.generate(processed_data)
+
+    def post_process(self, llm_response: str) -> Dict[str, float]:
+        """
+        Parse the LLM's JSON output to extract the faithfulness score.
+        """
+        try:
+            response_text = llm_response.strip().replace('```json', '').replace('```', '')
+            result = json.loads(response_text)
+            return {
+                "faithfulness_score": float(result.get("faithfulness_score", 0.0)),
+                "unfaithful_segments": result.get("unfaithful_segments", []),
+                "reasons": result.get("reasons", [])
+            }
+        except (json.JSONDecodeError, KeyError) as e:
+            return {
+                "faithfulness_score": -1.0,
+                "unfaithful_segments": [],
+                "reasons": [],
+                "error": str(e)
+            }
