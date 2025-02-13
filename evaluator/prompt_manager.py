@@ -346,6 +346,40 @@ class EvaluationType(BasePrompt):
         )
     }
 
+    ADHERENCE_FAITHFULNESS = {
+        'template': (
+            "Evaluate the faithfulness or adherence of the generated answer to the provided context.\n"
+            "Question: {question}\n"
+            "Context: {context}\n"
+            "Generated Answer: {answer}\n\n"
+            "You should determine if each part of the answer is grounded in the context. "
+            "If there is any information in the answer that does not appear in the context, penalize accordingly.\n"
+            "Consider these criteria: {criteria}\n\n"
+            "{formatter}"
+        ),
+        'criteria': (
+            "1. Check if all factual claims or statements in the generated answer appear or are supported by the context.\n"
+            "2. Identify any additional information not derivable from the context (hallucinations).\n"
+            "3. Provide an overall faithfulness_score between 0.0 (completely unfaithful) and 1.0 (fully faithful)."
+        ),
+        'formatter': (
+            "Respond ONLY with a JSON object containing:\n"
+            "- faithfulness_score (float between 0 and 1)\n"
+            "- unfaithful_segments (array of strings) listing any ungrounded or hallucinatory parts\n"
+            "- reasons (array of short statements explaining your assessment)\n\n"
+            "Example:\n"
+            "```json\n"
+            "{\n"
+            "  \"faithfulness_score\": 0.75,\n"
+            "  \"unfaithful_segments\": [\"Mention of brand new data not in context\"],\n"
+            "  \"reasons\": [\"Mostly grounded\", \"One detail not found in context\", \"Answer is partially incomplete\"]\n"
+            "}\n"
+            "```"
+        )
+    }
+    ...
+
+
 
 class PromptManager:
     """Manages prompt construction with JSON output formatting"""
