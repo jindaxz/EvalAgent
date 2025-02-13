@@ -4,7 +4,6 @@ from typing import List, Dict, Union
 from evaluator.base_evaluator import RAGEvaluator
 from evaluator.prompt_manager import EvaluationType
 from sentence_transformers import SentenceTransformer, util
-import torch
 
 # TODO: add AnswerEquivalenceEvaluatorWithBert
 class AnswerEquivalenceEvaluator(RAGEvaluator):
