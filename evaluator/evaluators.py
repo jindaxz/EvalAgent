@@ -3,6 +3,8 @@ import json
 from typing import List, Dict, Union
 from evaluator.base_evaluator import RAGEvaluator
 from evaluator.prompt_manager import EvaluationType
+from sentence_transformers import SentenceTransformer, util
+import torch
 
 # TODO: add AnswerEquivalenceEvaluatorWithBert
 class AnswerEquivalenceEvaluator(RAGEvaluator):
@@ -289,6 +291,52 @@ class FactualCorrectnessEvaluator(RAGEvaluator):
                 "TP": -1, "FP": -1, "FN": -1, "F1_SCORE": -1,
                 'error': str(e)
             }
+        
+class AnswerSimilarityEvaluator(RAGEvaluator):
+    """
+    Computes an embedding-based cosine similarity score between the generated answer and the ground-truth answer.
+    Paper:Evaluation of RAG Metrics for Question Answering in the Telecom Domain,https://arxiv.org/abs/2407.12873 
+    """
+    def __init__(self, llm, prompt_manager, model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
+        """
+        Args:
+            llm: Pass a dummy or None, we won't use it in this evaluator.
+            prompt_manager: Not used here, but required by base class signature.
+            model_name: The pretrained model name to use for sentence embedding.
+        """
+        super().__init__(llm, prompt_manager)
+        self.model = SentenceTransformer(model_name)
+
+    def pre_process(self, question, context, answer, **kwargs):
+        """
+        No LLM prompt is needed. Ensure golden_answer is available in kwargs.
+        """
+        if "golden_answer" not in kwargs:
+            raise KeyError("AnswerSimilarityEvaluator requires 'golden_answer' in kwargs.")
+        self.generated_answer = answer
+        self.golden_answer = kwargs["golden_answer"]
+        return None  # We don't need a prompt to pass to an LLM
+
+    def call_llm(self, processed_data: Any) -> str:
+        """
+        We don't call the LLM here. Return an empty string or dummy response.
+        """
+        return ""
+
+    def post_process(self, llm_response: str) -> Dict[str, float]:
+        """
+        Compute the embeddings for the generated answer and the golden answer,return cosine similarity.
+        """
+        # Encode the answers into sentence embeddings
+        gen_emb = self.model.encode(self.generated_answer, convert_to_tensor=True)
+        gold_emb = self.model.encode(self.golden_answer, convert_to_tensor=True)
+
+        # Compute cosine similarity
+        similarity = util.cos_sim(gen_emb, gold_emb).item()
+
+        return {
+            "answer_similarity": float(similarity)  
+        }
             
 class KeyPointEvaluator(RAGEvaluator):
     """
