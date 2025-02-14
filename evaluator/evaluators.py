@@ -3,6 +3,7 @@ import json
 from typing import List, Dict, Union
 from evaluator.base_evaluator import RAGEvaluator
 from evaluator.prompt_manager import EvaluationType
+from sentence_transformers import SentenceTransformer, util
 
 # TODO: add AnswerEquivalenceEvaluatorWithBert
 class AnswerEquivalenceEvaluator(RAGEvaluator):
@@ -289,7 +290,53 @@ class FactualCorrectnessEvaluator(RAGEvaluator):
                 "TP": -1, "FP": -1, "FN": -1, "F1_SCORE": -1,
                 'error': str(e)
             }
+        
+class AnswerSimilarityEvaluator(RAGEvaluator):
+    """
+    Computes an embedding-based cosine similarity score between the generated answer and the ground-truth answer.
+    Paper:Evaluation of RAG Metrics for Question Answering in the Telecom Domain,https://arxiv.org/abs/2407.12873 
+    """
+    def __init__(self, llm, prompt_manager, model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
+        """
+        Args:
+            llm: Pass a dummy or None, we won't use it in this evaluator.
+            prompt_manager: Not used here, but required by base class signature.
+            model_name: The pretrained model name to use for sentence embedding.
+        """
+        super().__init__(llm, prompt_manager)
+        self.model = SentenceTransformer(model_name)
+
+    def pre_process(self, question, context, answer, **kwargs):
+        # No actual prompt needed. 
+        pass
+
+    def call_llm(self, processed_data: Any) -> str:
+        # Not calling an LLM. 
+        pass
+
+    def post_process(self, llm_response: str) -> Dict[str, float]:
+        # Not parsing any LLM JSON output. 
+        pass
             
+    def evaluate(self, question, context, answer, **kwargs) -> Dict[str, float]:
+        """
+        Perform the main logic of computing answer similarity using embeddings.
+        """
+        # 1. Validate that 'golden_answer' is provided
+        if "golden_answer" not in kwargs:
+            raise KeyError("AnswerSimilarityEvaluator requires 'golden_answer' in kwargs.")
+        golden_answer = kwargs["golden_answer"]
+
+        # 2. Compute embeddings and cosine similarity
+        gen_emb = self.model.encode(answer, convert_to_tensor=True)
+        gold_emb = self.model.encode(golden_answer, convert_to_tensor=True)
+        similarity = util.cos_sim(gen_emb, gold_emb).item()
+
+        # 3. Return the final score dict
+        return {
+            "answer_similarity": float(similarity)
+        }
+    
 class KeyPointEvaluator(RAGEvaluator):
     """
     From https://arxiv.org/abs/2408.01262, using extracted key points generate from ground truth answer to check with generated answer,
@@ -345,4 +392,91 @@ class KeyPointEvaluator(RAGEvaluator):
                 "raw_output" : response_text,
                 "error": str(e),
             }
-        
+
+
+class AdherenceFaithfulnessEvaluator(RAGEvaluator):
+    """
+    Uses an LLM to verify that all parts of the generated answer are grounded in the provided context.
+    Returns a faithfulness_score between 0 and 1, plus any unfaithful (hallucinated) segments.
+    Related paper:ASTRID - An Automated and Scalable TRIaD for the Evaluation of RAG-based Clinical Question Answering Systems,
+    https://arxiv.org/abs/2501.08208 
+    """
+
+    def pre_process(
+        self,
+        question: str | List[str],
+        context: str | List[str],
+        answer: str | List[str],
+        **kwargs
+    ) -> str:
+  
+        return self.prompt_manager.build_prompt(
+            question=question,
+            context=context,
+            answer=answer,
+            eval_type=EvaluationType.ADHERENCE_FAITHFULNESS
+        )
+
+    def call_llm(self, processed_data: str) -> str:
+        """
+        Invoke the LLM with the processed prompt and return its raw text response.
+        """
+        return self.llm.generate(processed_data)
+
+    def post_process(self, llm_response: str) -> Dict[str, float]:
+        """
+        Parse the LLM's JSON output to extract the faithfulness score.
+        """
+        try:
+            response_text = llm_response.strip().replace('```json', '').replace('```', '')
+            result = json.loads(response_text)
+            return {
+                "faithfulness_score": float(result.get("faithfulness_score", 0.0)),
+                "unfaithful_segments": result.get("unfaithful_segments", []),
+                "reasons": result.get("reasons", [])
+            }
+        except (json.JSONDecodeError, KeyError) as e:
+            return {
+                "faithfulness_score": -1.0,
+                "unfaithful_segments": [],
+                "reasons": [],
+                "error": str(e)
+            }
+
+
+
+class ContextUtilizationEvaluator(RAGEvaluator):
+    def pre_process(self, question, context, answer):
+        self.context = context
+        return self.prompt_manager.build_prompt(
+            question=question,
+            answer=answer,
+            eval_type=EvaluationType.CONTEXT_UTILIZATION,
+            context=context
+        )
+
+    def call_llm(self, processed_data):
+        return self.llm.generate(processed_data)
+
+    def post_process(self, llm_response):
+        try:
+            print(f"Raw LLM response: {llm_response}")
+            response_text = llm_response.strip().replace('```json', '').replace('```', '')
+            result = json.loads(response_text)
+
+            context = self.context if hasattr(self, "context") else []
+            
+            print(f"Context: {context}")
+            relevant_context = result.get("relevant_context", [])
+            # irrelevant_context = result.get("irrelevant_context", [])
+
+            total_context = len(context)
+            relevant_count = len(relevant_context)
+            context_utilization_score = relevant_count / total_context if total_context > 0 else 0
+            return context_utilization_score
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Error parsing LLM response: {llm_response}")
+            return {
+                "context_utilization_score": -1,
+                'error': str(e)
+            }
