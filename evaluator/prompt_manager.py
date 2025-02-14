@@ -346,67 +346,38 @@ class EvaluationType(BasePrompt):
         )
     }
 
-    ADHERENCE_FAITHFULNESS = {
+    META_REVIEW_LEARNING_FACILITATION = {
         'template': (
-            "Evaluate the faithfulness or adherence of the generated answer to the provided context.\n"
+            "You are a meta reviewer. Your task is to evaluate the learning facilitation of a Retrieval-Augmented Generation (RAG) system and its generated answer.\n"
+            "Below is the original question, the retrieved context, and the answer produced by the RAG system:\n"
             "Question: {question}\n"
             "Context: {context}\n"
-            "Generated Answer: {answer}\n\n"
-            "You should determine if each part of the answer is grounded in the context. "
-            "If there is any information in the answer that does not appear in the context, penalize accordingly.\n"
-            "Consider these criteria: {criteria}\n\n"
+            "Answer: {answer}\n\n"
+            "Additionally, you are provided with the scores and rationales from two independent reviewers who evaluated the learning facilitation aspect:\n"
+            "Reviewer 1 Score: {score1}\n"
+            "Reviewer 1 Reason: {reason1}\n"
+            "Reviewer 2 Score: {score2}\n"
+            "Reviewer 2 Reason: {reason2}\n\n"
+            "Consider the following evaluation criteria:\n"
+            "{criteria}\n\n"
             "{formatter}"
         ),
         'criteria': (
-            "1. Check if all factual claims or statements in the generated answer appear or are supported by the context.\n"
-            "2. Identify any additional information not derivable from the context (hallucinations).\n"
-            "3. Provide an overall faithfulness_score between 0.0 (completely unfaithful) and 1.0 (fully faithful)."
+            "1. Assess whether the answer effectively promotes further inquiry and learning.\n"
+            "2. Evaluate the clarity and educational value of the explanation provided.\n"
+            "3. Consider the use of examples, analogies, or interactive elements that facilitate learning.\n"
+            "4. Determine the overall impact of the generated answer on enhancing learning and curiosity."
         ),
         'formatter': (
             "Respond ONLY with a JSON object containing:\n"
-            "- faithfulness_score (float between 0 and 1)\n"
-            "- unfaithful_segments (array of strings) listing any ungrounded or hallucinatory parts\n"
-            "- reasons (array of short statements explaining your assessment)\n\n"
+            "- meta_score (float): The combined evaluation score for the answer's learning facilitation.\n"
+            "- reasons (array of 3 concise strings explaining the combined score, including commentary on how the reviewers' assessments align or differ).\n"
             "Example:\n"
             "```json\n"
-            "{\n"
-            "  \"faithfulness_score\": 0.75,\n"
-            "  \"unfaithful_segments\": [\"Mention of brand new data not in context\"],\n"
-            "  \"reasons\": [\"Mostly grounded\", \"One detail not found in context\", \"Answer is partially incomplete\"]\n"
-            "}\n"
-            "```"
-        )
-    }
-    ...
-
-
-
-    CONTEXT_UTILIZATION = {
-        'template': (
-            "Analyze the context documents in relation to the generated response.\n"
-            "Identify which documents contain relevant information used in the response and which do not.\n\n"
-            "Question: {question}\nContext: {context}\nAnswer: {answer}\n"
-            "Consider these criteria: {criteria}\n\n"
-            "{formatter}"
-        ),
-        'criteria': (
-            "1. A document is relevant if any of its information is directly referenced or paraphrased in the answer.\n"
-            "2. A document is irrelevant if none of its information contributes to forming the answer.\n"
-            "3. Ensure classification is based on explicit or implicit content alignment between context and answer.\n"
-            "4. Do NOT include any information in relevant_context that is not explicitly present in the original context."
-        ),
-        'formatter': (
-            "Respond ONLY with a JSON object containing:\n"
-            "- relevant_context (array of strings)\n"
-            "- irrelevant_context (array of strings)\n"
-            "- reason (string explaining why the documents were classified this way)\n"
-            "Example:\n"
-            "```json\n"
-            "{\n"
-            '  "relevant_context": ["doc1", "doc3"],\n'
-            '  "irrelevant_context": ["doc2", "doc4"],\n'
-            '  "reason": "doc1 and doc3 contain key facts from the answer, while doc2 and doc4 are unrelated."\n'
-            "}\n"
+            '{\n'
+            '  \"meta_score\": 4.5,\n'
+            '  \"reasons\": [\"The answer encourages further inquiry effectively\", \"Clear and educational explanation with relatable examples\", \"Reviewers largely agree on its strong learning facilitation impact\"]\n'
+            '}\n'
             "```"
         )
     }
