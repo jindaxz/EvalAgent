@@ -381,6 +381,37 @@ class EvaluationType(BasePrompt):
 
 
 
+    CONTEXT_UTILIZATION = {
+        'template': (
+            "Analyze the context documents in relation to the generated response.\n"
+            "Identify which documents contain relevant information used in the response and which do not.\n\n"
+            "Question: {question}\nContext: {context}\nAnswer: {answer}\n"
+            "Consider these criteria: {criteria}\n\n"
+            "{formatter}"
+        ),
+        'criteria': (
+            "1. A document is relevant if any of its information is directly referenced or paraphrased in the answer.\n"
+            "2. A document is irrelevant if none of its information contributes to forming the answer.\n"
+            "3. Ensure classification is based on explicit or implicit content alignment between context and answer.\n"
+            "4. Do NOT include any information in relevant_context that is not explicitly present in the original context."
+        ),
+        'formatter': (
+            "Respond ONLY with a JSON object containing:\n"
+            "- relevant_context (array of strings)\n"
+            "- irrelevant_context (array of strings)\n"
+            "- reason (string explaining why the documents were classified this way)\n"
+            "Example:\n"
+            "```json\n"
+            "{\n"
+            '  "relevant_context": ["doc1", "doc3"],\n'
+            '  "irrelevant_context": ["doc2", "doc4"],\n'
+            '  "reason": "doc1 and doc3 contain key facts from the answer, while doc2 and doc4 are unrelated."\n'
+            "}\n"
+            "```"
+        )
+    }
+
+
 class PromptManager:
     """Manages prompt construction with JSON output formatting"""
     
