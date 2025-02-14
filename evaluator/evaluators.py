@@ -307,36 +307,36 @@ class AnswerSimilarityEvaluator(RAGEvaluator):
         self.model = SentenceTransformer(model_name)
 
     def pre_process(self, question, context, answer, **kwargs):
-        """
-        No LLM prompt is needed. Ensure golden_answer is available in kwargs.
-        """
-        if "golden_answer" not in kwargs:
-            raise KeyError("AnswerSimilarityEvaluator requires 'golden_answer' in kwargs.")
-        self.generated_answer = answer
-        self.golden_answer = kwargs["golden_answer"]
-        return None  # We don't need a prompt to pass to an LLM
+        # No actual prompt needed. 
+        pass
 
     def call_llm(self, processed_data: Any) -> str:
-        """
-        We don't call the LLM here. Return an empty string or dummy response.
-        """
-        return ""
+        # Not calling an LLM. 
+        pass
 
     def post_process(self, llm_response: str) -> Dict[str, float]:
+        # Not parsing any LLM JSON output. 
+        pass
+            
+    def evaluate(self, question, context, answer, **kwargs) -> Dict[str, float]:
         """
-        Compute the embeddings for the generated answer and the golden answer,return cosine similarity.
+        Perform the main logic of computing answer similarity using embeddings.
         """
-        # Encode the answers into sentence embeddings
-        gen_emb = self.model.encode(self.generated_answer, convert_to_tensor=True)
-        gold_emb = self.model.encode(self.golden_answer, convert_to_tensor=True)
+        # 1. Validate that 'golden_answer' is provided
+        if "golden_answer" not in kwargs:
+            raise KeyError("AnswerSimilarityEvaluator requires 'golden_answer' in kwargs.")
+        golden_answer = kwargs["golden_answer"]
 
-        # Compute cosine similarity
+        # 2. Compute embeddings and cosine similarity
+        gen_emb = self.model.encode(answer, convert_to_tensor=True)
+        gold_emb = self.model.encode(golden_answer, convert_to_tensor=True)
         similarity = util.cos_sim(gen_emb, gold_emb).item()
 
+        # 3. Return the final score dict
         return {
-            "answer_similarity": float(similarity)  
+            "answer_similarity": float(similarity)
         }
-            
+    
 class KeyPointEvaluator(RAGEvaluator):
     """
     From https://arxiv.org/abs/2408.01262, using extracted key points generate from ground truth answer to check with generated answer,
