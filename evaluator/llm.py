@@ -72,6 +72,61 @@ class OpenAIClientLLM(LLMClient):
         
         return completion.choices[0].message.content
 
+class HTTPLLM(LLMClient):
+    """Concrete implementation using generic HTTP API endpoint"""
+    
+    def __init__(self,
+                 model: str = "deepseek_r1",
+                 base_url: str = "https://cloud.luchentech.com/api/maas/chat/completions",
+                 system_message: str = "You are a helpful and harmless assistant. You should think step-by-step.",
+                 **kwargs):
+        """
+        Initialize HTTP client
+        
+        Args:
+            model: Model identifier string
+            base_url: API endpoint URL
+            system_message: System prompt for conversation context  
+            kwargs: Additional parameters for completions
+        """
+        api_key = os.getenv("MAAS_API_KEY")
+        if not api_key:
+            raise ValueError("MAAS_API_KEY environment variable required")
+            
+        self.model = model
+        self.base_url = base_url
+        self.system_message = system_message
+        self.headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        }
+        self.params = {
+            "stream": False,
+            "max_tokens": 32000,
+            **kwargs
+        }
+
+    def generate(self, prompt: str) -> str:
+        """Execute synchronous HTTP request"""
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": self.system_message},
+                {"role": "user", "content": prompt}
+            ],
+            **self.params
+        }
+        
+        response = requests.post(
+            self.base_url,
+            headers=self.headers,
+            json=payload,
+            timeout=60
+        )
+        
+        response.raise_for_status()
+        return response.json()['choices'][0]['message']['content']
+
 class HFClient(LLMClient):
     """Concrete implementation for local Hugging Face models (GPU-only)"""
 
