@@ -1,23 +1,6 @@
 from enum import Enum, auto
 from typing import Dict, Any
-
-class BasePrompt(Enum):
-    """Base class for prompt enums with template and output formatting"""
-    @property
-    def template(self) -> str:
-        return self.value['template']
-    
-    @property
-    def criteria(self) -> str:
-        return self.value.get('criteria', '')
-    
-    @property
-    def formatter(self) -> str:
-        return self.value['formatter']
-    
-    @classmethod
-    def get_prompt_type(cls, name: str) -> 'BasePrompt':
-        return cls[name.upper()]
+from utils.base import BasePrompt
 
 class EvaluationType(BasePrompt):
     """Enumeration of different evaluation prompt types with JSON formatting"""
