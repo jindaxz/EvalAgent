@@ -3,6 +3,10 @@ import os
 from openai import OpenAI
 import requests
 import json
+from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline, GenerationConfig
+from huggingface_hub import login
+import torch
+import time
 
 class LLMClient(ABC):
     """Base class for LLM clients with standardized invocation interface"""
@@ -68,60 +72,93 @@ class OpenAIClientLLM(LLMClient):
         
         return completion.choices[0].message.content
 
-class HTTPLLM(LLMClient):
-    """Concrete implementation using generic HTTP API endpoint"""
-    
+class HFClient(LLMClient):
+    """Concrete implementation for local Hugging Face models (GPU-only)"""
+
     def __init__(self,
-                 model: str = "deepseek_r1",
-                 base_url: str = "https://cloud.luchentech.com/api/maas/chat/completions",
-                 system_message: str = "You are a helpful and harmless assistant. You should think step-by-step.",
+                 model_path: str,
+                 system_message: str = "You are a helpful assistant",
                  **kwargs):
         """
-        Initialize HTTP client
-        
-        Args:
-            model: Model identifier string
-            base_url: API endpoint URL
-            system_message: System prompt for conversation context  
-            kwargs: Additional parameters for completions
-        """
-        api_key = os.getenv("MAAS_API_KEY")
-        if not api_key:
-            raise ValueError("MAAS_API_KEY environment variable required")
-            
-        self.model = model
-        self.base_url = base_url
-        self.system_message = system_message
-        self.headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}"
-        }
-        self.params = {
-            "stream": False,
-            "max_tokens": 32000,
-            **kwargs
-        }
+        Initialize local Hugging Face client
 
-    def generate(self, prompt: str) -> str:
-        """Execute synchronous HTTP request"""
-        payload = {
-            "model": self.model,
-            "messages": [
-                {"role": "system", "content": self.system_message},
-                {"role": "user", "content": prompt}
-            ],
-            **self.params
-        }
+        Args:
+            model_path: Path or name of Hugging Face model
+            system_message: System prompt for conversation context
+            kwargs: Additional parameters
+        """
+        # Retrieve Hugging Face token from environment variable
+        hf_token = os.getenv("HUGGINGFACE_TOKEN")
+        if not hf_token:
+            raise ValueError("HUGGINGFACE_TOKEN environment variable is not set")
+
+        # Authenticate with Hugging Face
+        login(token=hf_token)
         
-        response = requests.post(
-            self.base_url,
-            headers=self.headers,
-            json=payload,
-            timeout=60
+        self.model_path = model_path
+        self.system_message = system_message
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, token=hf_token)
+        self.model = AutoModelForCausalLM.from_pretrained(self.model_path, token=hf_token).to(self.device)
+        
+        self.generation_config = GenerationConfig.from_pretrained(self.model_path)
+        # Set pad_token_id based on the tokenizer's eos_token_id.
+        eos_id = self.tokenizer.eos_token_id
+        if isinstance(eos_id, list):
+            eos_id = eos_id[0]
+        self.generation_config.pad_token_id = eos_id
+
+    def generate(self, prompt: str, **kwargs) -> str:
+        # Determine how to format the prompt
+        if hasattr(self.tokenizer, 'chat_template') and self.tokenizer.chat_template:
+            messages = [{"role": "user", "content": prompt}]
+            # Generate input tensor using the chat template
+            input_tensor = self.tokenizer.apply_chat_template(
+                messages,
+                add_generation_prompt=True,
+                return_tensors="pt"
+            ).to(self.device)
+            # Decode the formatted prompt to know its text length
+            formatted_prompt = self.tokenizer.decode(input_tensor[0], skip_special_tokens=True)
+        else:
+            # Fallback: manual formatting of the prompt
+            full_prompt = f"{self.system_message}\n\nUser: {prompt}\n\nAssistant:"
+            input_tensor = self.tokenizer(full_prompt, return_tensors="pt").input_ids.to(self.device)
+            formatted_prompt = full_prompt  # Use the full prompt as formatted prompt
+
+        # Set max_new_tokens if not provided
+        max_new_tokens = kwargs.pop('max_new_tokens', 1000)
+        
+        # Start time counting before generation
+        start_time = time.time()
+        
+        outputs = self.model.generate(
+            input_tensor,
+            generation_config=self.generation_config,
+            max_new_tokens=max_new_tokens,
+            **kwargs
         )
         
-        response.raise_for_status()
-        return response.json()['choices'][0]['message']['content']
+        # End time counting after generation
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f"Inference time: {elapsed_time:.2f} seconds")
+        
+        # Decode the complete generated text
+        generated_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        # Remove the input prompt portion to get only the assistant's response
+        assistant_response = generated_text[len(formatted_prompt):]
+        
+        # Additional filtering for DeepSeek: remove everything before and including '</think>'
+        if "</think>" in assistant_response:
+            idx = assistant_response.find("</think>")
+            assistant_response = assistant_response[idx + len("</think>"):].strip()
+        
+        return assistant_response.strip()
+
+
+
 
 # Example usage
 if __name__ == "__main__":
