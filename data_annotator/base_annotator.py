@@ -1,27 +1,32 @@
-import os
 import asyncio
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 from datasets import Dataset, DatasetDict, load_dataset
-from utils.llm import LLMClient
+from utils.llm import LLMClient, OpenAIClientLLM
+from data_annotator.prompt_manager import AnnotatePromptManager
 
 
 class DataAnnotator(ABC):
     def __init__(
-        self, llm: LLMClient, prompt_manger, annotation_column: str = "llm_annotation"
+        self,
+        llm_class: type[LLMClient] = None,
+        annotation_column: str = "llm_annotation",
+        **llm_kwargs
     ):
-        self.llm = llm
-        self.prompt_manger = prompt_manger
+        self.llm = llm_class() if llm_class else OpenAIClientLLM()
+        self.prompt_manager = AnnotatePromptManager()
         self.annotation_column = annotation_column
 
-    def load_data(self, dataset_name: str, config: Optional[str] = None) -> DatasetDict:
+    @classmethod
+    def load_data(cls, dataset_name: str, config: Optional[str] = None) -> DatasetDict:
         """Load dataset from Hugging Face hub"""
         dataset = load_dataset(dataset_name, config)
         if not isinstance(dataset, DatasetDict):
             dataset = DatasetDict({"train": dataset})
         return dataset
 
-    def detect_splits(self, dataset: DatasetDict) -> List[str]:
+    @classmethod
+    def detect_splits(cls, dataset: DatasetDict) -> List[str]:
         """Detect available splits in the dataset"""
         return [split for split in ["train", "validation", "test"] if split in dataset]
 
@@ -54,7 +59,7 @@ class DataAnnotator(ABC):
         """Process a single example with rate limiting"""
         async with semaphore:
             processed = self.pre_process(row)
-            response = await self.call_llm(processed["prompt"])
+            response = await self.call_llm(processed)
             return self.post_process(response, row)
 
     @abstractmethod
@@ -63,7 +68,7 @@ class DataAnnotator(ABC):
         pass
 
     @abstractmethod
-    async def call_llm(self, prompt: str) -> str:
+    async def call_llm(self, processed_dict: Dict) -> str:
         """Call LLM with formatted prompt"""
         pass
 
