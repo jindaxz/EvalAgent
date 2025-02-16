@@ -40,4 +40,4 @@ class KeyPointAnnotator(DataAnnotator):
             return result["key_points"]
         except (json.JSONDecodeError, KeyError) as e:
             print(f"Error parsing LLM response: {response_text}")
-            return {"row": row, "error": str(e)}
+            return {["error"]}
