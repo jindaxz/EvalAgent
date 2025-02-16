@@ -7,6 +7,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline, Generati
 from huggingface_hub import login
 import torch
 import time
+from vllm import LLM
 
 class LLMClient(ABC):
     """Base class for LLM clients with standardized invocation interface"""
@@ -212,6 +213,103 @@ class HFClient(LLMClient):
         
         return assistant_response.strip()
 
+
+
+class VLLMClient(LLMClient):
+    """Optimized implementation using vLLM inference engine"""
+    
+    def __init__(self,
+                 model_path: str = "deepseek-ai/deepseek-r1",
+                 system_message: str = "You are a helpful and harmless assistant. Think step-by-step.",
+                 quant_method: str = "awq",
+                 **kwargs):
+        """
+        Initialize vLLM client with optimized configurations
+        
+        Args:
+            model_path: Local path or HF repo ID
+            system_message: System prompt for context
+            quant_method: Quantization method (awq, gptq, none)
+            kwargs: Additional engine parameters
+        """
+        self.model_path = model_path
+        self.system_message = system_message
+        self.quant_config = self._get_quant_config(quant_method)
+        
+        # Initialize vLLM engine with optimized params
+        self.engine = AsyncLLMEngine.from_engine_args(
+            engine_args=EngineArgs(
+                model=self.model_path,
+                quantization=self.quant_config,
+                tensor_parallel_size=torch.cuda.device_count(),
+                max_model_len=16384,
+                enforce_eager=True,  # Bypass graph capture for dynamic inputs
+                **kwargs
+            )
+        )
+        
+        self.generation_config = {
+            "max_tokens": 32000,
+            "temperature": 0.7,
+            "top_p": 0.95,
+            "frequency_penalty": 0.5
+        }
+
+    def _get_quant_config(self, method: str):
+        """Configure quantization method"""
+        if method == "awq":
+            return AWQConfig(quant_method="awq")
+        elif method == "gptq":
+            return GPTQConfig(bits=4, group_size=128)
+        return None
+
+    async def generate(self, prompt: str, **kwargs) -> str:
+        """Execute optimized generation with vLLM"""
+        sampling_params = SamplingParams(
+            **{**self.generation_config, **kwargs}
+        )
+        
+        # Format messages with system prompt
+        messages = [
+            {"role": "system", "content": self.system_message},
+            {"role": "user", "content": prompt}
+        ]
+        
+        # Use vLLM's optimized tokenizer
+        tokenizer = self.engine.engine.tokenizer
+        if hasattr(tokenizer, "apply_chat_template"):
+            formatted_prompt = tokenizer.apply_chat_template(
+                messages,
+                add_generation_prompt=True,
+                tokenize=False
+            )
+        else:
+            formatted_prompt = f"{self.system_message}\n\nUser: {prompt}\nAssistant:"
+
+        # Async streaming generation
+        results_generator = self.engine.generate(
+            formatted_prompt, 
+            sampling_params,
+            request_id=uuid.uuid4().hex
+        )
+
+        # Collect output
+        async for request_output in results_generator:
+            return request_output.outputs[0].text
+
+    def batch_generate(self, prompts: List[str], **kwargs) -> List[str]:
+        """Optimized batch processing with continuous batching"""
+        sampling_params = SamplingParams(
+            **{**self.generation_config, **kwargs}
+        )
+        
+        outputs = self.engine.generate_batch(
+            prompts,
+            sampling_params=sampling_params,
+            use_tqdm=False
+        )
+        
+        return [output.outputs[0].text for output in outputs]
 
 
 
