@@ -1,15 +1,29 @@
 import asyncio
 from typing import List, Dict, Optional
 from concurrent.futures import ProcessPoolExecutor
-from datasets import Dataset, DatasetDict
+from datasets import Dataset, DatasetDict, load_dataset
 from data_annotator.base_annotator import DataAnnotator
+from evaluator.base_evaluator import RAGEvaluator
 from data_annotator.annotators import KeyPointAnnotator
 import os
 
 
-class AnnotationExecutor:
+def load_data(dataset_name: str, config: Optional[str] = None) -> DatasetDict:
+    """Load dataset from Hugging Face hub"""
+    dataset = load_dataset(dataset_name, config)
+    if not isinstance(dataset, DatasetDict):
+        dataset = DatasetDict({"train": dataset})
+    return dataset
+
+
+def detect_splits(dataset: DatasetDict) -> List[str]:
+    """Detect available splits in the dataset"""
+    return [split for split in ["train", "validation", "test"] if split in dataset]
+
+
+class Executor:
     def __init__(
-        self, annotator_class: type[DataAnnotator], num_workers: int = os.cpu_count()
+            self, annotator_class: type[DataAnnotator], num_workers: int = os.cpu_count()
     ):
         self.annotator_class = annotator_class
         self.num_workers = num_workers
@@ -17,7 +31,7 @@ class AnnotationExecutor:
     async def run(self, dataset: DatasetDict, **annotator_kwargs) -> DatasetDict:
         """Process entire DatasetDict across splits with parallel processing"""
         processed_splits = {}
-        splits = self.annotator_class.detect_splits(dataset)
+        splits = detect_splits(dataset)
 
         with ProcessPoolExecutor(max_workers=self.num_workers) as executor:
             loop = asyncio.get_event_loop()
@@ -39,38 +53,32 @@ class AnnotationExecutor:
         return DatasetDict(processed_splits)
 
     @staticmethod
-    def _process_split(
-        annotator_class: type[DataAnnotator], split_data: Dataset, annotator_kwargs
-    ):
+    def _process_split(annotator_class: type[DataAnnotator] | type[RAGEvaluator], split_data: Dataset, kwargs):
         """Instantiate inside worker process"""
-        annotator = annotator_class(**annotator_kwargs)  # Create instance here
+        annotator = annotator_class(**kwargs)  # Create instance here
         processed = asyncio.run(annotator.process_split(split_data))
-        return split_data.add_column(annotator.annotation_column, processed)
+        for col_name, list_data in processed.items():
+            split_data.add_column(col_name, list_data)
+        return split_data
 
 
-class AnnotatorPipeline:
-    def __init__(self, annotator_classes: List[type[DataAnnotator]]):
-        self.annotator_classes = annotator_classes
-        self.executors = [AnnotationExecutor(cls) for cls in annotator_classes]
+class ExecutionPipeline:
+    def __init__(self, processor_classes: List[type[DataAnnotator] | type[RAGEvaluator]]):
+        self.processor_classes = processor_classes
+        self.executors = [Executor(cls) for cls in processor_classes]
 
-    async def run_pipeline(
-        self,
-        dataset_name: str,
-        save_path: str,
-        upload_to_hub: bool = False,
-        repo_id: Optional[str] = None,
-        **annotator_kwargs
-    ) -> DatasetDict:
+    async def run_pipeline(self, dataset_name: str, save_path: str, upload_to_hub: bool = False,
+                           repo_id: Optional[str] = None, **kwargs) -> DatasetDict:
         # Load initial dataset
-        initial_dataset = self.annotator_classes[0].load_data(dataset_name)
+        initial_dataset = load_data(dataset_name)
         current_dataset = initial_dataset
 
         # Create fresh instances in executor processes
-        for annotator_cls, executor in zip(self.annotator_classes, self.executors):
+        for annotator_cls, executor in zip(self.processor_classes, self.executors):
             current_dataset = await executor.run(
                 dataset=current_dataset,
                 annotator_class=annotator_cls,
-                **annotator_kwargs
+                **kwargs
             )
 
         current_dataset.save_to_disk(save_path)
