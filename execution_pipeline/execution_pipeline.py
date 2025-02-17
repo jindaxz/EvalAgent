@@ -22,13 +22,11 @@ def detect_splits(dataset: DatasetDict) -> List[str]:
 
 
 class Executor:
-    def __init__(
-            self, annotator_class: type[DataAnnotator], num_workers: int = os.cpu_count()
-    ):
-        self.annotator_class = annotator_class
+    def __init__(self, processor_class: type[DataAnnotator] | type[RAGEvaluator], num_workers: int = os.cpu_count()):
+        self.processor_class = processor_class
         self.num_workers = num_workers
 
-    async def run(self, dataset: DatasetDict, **annotator_kwargs) -> DatasetDict:
+    async def run(self, dataset: DatasetDict, **kwargs) -> DatasetDict:
         """Process entire DatasetDict across splits with parallel processing"""
         processed_splits = {}
         splits = detect_splits(dataset)
@@ -39,9 +37,9 @@ class Executor:
                 loop.run_in_executor(
                     executor,
                     self._process_split,
-                    self.annotator_class,
+                    self.processor_class,
                     dataset[split],
-                    annotator_kwargs,
+                    kwargs,
                 )
                 for split in splits
             ]
@@ -53,12 +51,12 @@ class Executor:
         return DatasetDict(processed_splits)
 
     @staticmethod
-    def _process_split(annotator_class: type[DataAnnotator] | type[RAGEvaluator], split_data: Dataset, kwargs):
+    def _process_split(processor_class: type[DataAnnotator] | type[RAGEvaluator], split_data: Dataset, kwargs):
         """Instantiate inside worker process"""
-        annotator = annotator_class(**kwargs)  # Create instance here
+        annotator = processor_class(**kwargs)  # Create instance here
         processed = asyncio.run(annotator.process_split(split_data))
         for col_name, list_data in processed.items():
-            split_data.add_column(col_name, list_data)
+            split_data = split_data.add_column(col_name, list_data)
         return split_data
 
 
@@ -74,10 +72,9 @@ class ExecutionPipeline:
         current_dataset = initial_dataset
 
         # Create fresh instances in executor processes
-        for annotator_cls, executor in zip(self.processor_classes, self.executors):
+        for _cls, executor in zip(self.processor_classes, self.executors):
             current_dataset = await executor.run(
                 dataset=current_dataset,
-                annotator_class=annotator_cls,
                 **kwargs
             )
 

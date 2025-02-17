@@ -24,16 +24,17 @@ class AnswerEquivalenceEvaluator(RAGEvaluator):
         return {'prompt': self.pre_process(
             question=row[RAGBENCH_COL_NAMES.QUESTION.value],
             context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
-            answer=row[RAGBENCH_COL_NAMES.GENERATED_ANSWER.value],
+            answer=row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value],  # TODO: ragbench golden answer should be re-considered
             gold_answer=row[RAGBENCH_COL_NAMES.GENERATED_ANSWER.value]
         )}
 
-    async def a_call_llm(self, processed: Dict) -> str:
+    async def a_call_llm(self, processed: Dict) -> Dict:
         assert 'prompt' in processed, f'Prompt missing'
-        return await self.llm.a_call_llm(processed['prompt'])
+        processed['llm_response'] = await self.llm.a_generate(processed['prompt'])
+        return processed
 
-    def post_process_row(self, response: str, row: Dict) -> Dict:
-        result = self.post_process(response)
+    def post_process_row(self, processed: Dict, row: Dict) -> Dict:
+        result = self.post_process(processed['llm_response'])
         try:
             return {key: result[key] for key in self.EVAL_COLUMNS}
         except KeyError:
@@ -62,7 +63,7 @@ class AnswerEquivalenceEvaluator(RAGEvaluator):
         # Execute LLM call with constructed prompt
         return self.llm.generate(processed_data)
 
-    def post_process(self, llm_response: str) -> Dict[str, float]:
+    def post_process(self, llm_response: str, **kwargs) -> Dict[str, float]:
         """Parse JSON response into scores dictionary"""
         try:
             # Clean response and parse JSON
@@ -101,15 +102,16 @@ class RefusalAccuracyEvaluator(RAGEvaluator):
         return {'prompt': self.pre_process(
             question=row[RAGBENCH_COL_NAMES.QUESTION.value],
             context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
-            answer=row[RAGBENCH_COL_NAMES.GENERATED_ANSWER.value],
+            answer=row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value],  # TODO: ragbench golden answer should be re-considered
         )}
 
-    async def a_call_llm(self, processed: Dict) -> str:
+    async def a_call_llm(self, processed: Dict) -> Dict:
         assert 'prompt' in processed, f'Prompt missing'
-        return await self.llm.a_call_llm(processed['prompt'])
+        processed['llm_response'] = await self.llm.a_generate(processed['prompt'])
+        return processed
 
-    def post_process_row(self, response: str, row: Dict) -> Dict:
-        result = self.post_process(response)
+    def post_process_row(self, processed: Dict, row: Dict) -> Dict:
+        result = self.post_process(processed['llm_response'])
         try:
             return {key: result[key] for key in self.EVAL_COLUMNS}
         except KeyError:
@@ -121,7 +123,7 @@ class RefusalAccuracyEvaluator(RAGEvaluator):
     def call_llm(self, processed_data):
         pass
 
-    def post_process(self, llm_response):
+    def post_process(self, llm_response, **kwargs):
         pass
 
     def evaluate(self, question: str | List[str], context: str | List[str], answer: str | List[str], **kwargs):
@@ -180,15 +182,16 @@ class LearningFacilitationEvaluator(RAGEvaluator):
         return {'prompt': self.pre_process(
             question=row[RAGBENCH_COL_NAMES.QUESTION.value],
             context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
-            answer=row[RAGBENCH_COL_NAMES.GENERATED_ANSWER.value],
+            answer=row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value],  # TODO: ragbench golden answer should be re-considered
         )}
 
-    async def a_call_llm(self, processed: Dict) -> str:
+    async def a_call_llm(self, processed: Dict) -> Dict:
         assert 'prompt' in processed, f'Prompt missing'
-        return await self.llm.a_call_llm(processed['prompt'])
+        processed['llm_response'] = await self.llm.a_generate(processed['prompt'])
+        return processed
 
-    def post_process_row(self, response: str, row: Dict) -> Dict:
-        result = self.post_process(response)
+    def post_process_row(self, processed: Dict, row: Dict) -> Dict:
+        result = self.post_process(processed['llm_response'])
         try:
             return {key: result[key] for key in self.EVAL_COLUMNS}
         except KeyError:
@@ -211,7 +214,7 @@ class LearningFacilitationEvaluator(RAGEvaluator):
         # Execute LLM call with constructed prompt
         return self.llm.generate(processed_data)
 
-    def post_process(self, llm_response: str) -> Dict[str, float]:
+    def post_process(self, llm_response: str, **kwargs) -> Dict[str, float]:
         """Parse JSON response into scores dictionary"""
         try:
             print(f"Raw LLM response: {llm_response}")
@@ -248,15 +251,16 @@ class EngagementEvaluator(RAGEvaluator):
         return {'prompt': self.pre_process(
             question=row[RAGBENCH_COL_NAMES.QUESTION.value],
             context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
-            answer=row[RAGBENCH_COL_NAMES.GENERATED_ANSWER.value],
+            answer=row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value],  # TODO: ragbench golden answer should be re-considered
         )}
 
-    async def a_call_llm(self, processed: Dict) -> str:
+    async def a_call_llm(self, processed: Dict) -> Dict:
         assert 'prompt' in processed, f'Prompt missing'
-        return await self.llm.a_call_llm(processed['prompt'])
+        processed['llm_response'] = await self.llm.a_generate(processed['prompt'])
+        return processed
 
-    def post_process_row(self, response: str, row: Dict) -> Dict:
-        result = self.post_process(response)
+    def post_process_row(self, processed: Dict, row: Dict) -> Dict:
+        result = self.post_process(processed['llm_response'])
         try:
             return {key: result[key] for key in self.EVAL_COLUMNS}
         except KeyError:
@@ -279,7 +283,7 @@ class EngagementEvaluator(RAGEvaluator):
         # Execute LLM call with constructed prompt
         return self.llm.generate(processed_data)
 
-    def post_process(self, llm_response: str) -> Dict[str, Union[float, List[str]]]:
+    def post_process(self, llm_response: str, **kwargs) -> Dict[str, Union[float, List[str]]]:
         """Parse JSON response into scores dictionary"""
         try:
             print(f"Raw LLM response: {llm_response}")
@@ -312,6 +316,7 @@ class ContextRelevanceEvaluator(RAGEvaluator):
     From https://arxiv.org/abs/2501.08208, Use their definition of context relevance to build prompt.
     This method evaluates the context relevance of the retrieved context compared to the input question.
     """
+
     def __init__(self, llm_class: type[LLMClient] = None, **llm_kwargs):
         super().__init__(llm_class, **llm_kwargs)
         self.EVAL_COLUMNS = ["relevance_score"]
@@ -320,15 +325,16 @@ class ContextRelevanceEvaluator(RAGEvaluator):
         return {'prompt': self.pre_process(
             question=row[RAGBENCH_COL_NAMES.QUESTION.value],
             context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
-            answer=row[RAGBENCH_COL_NAMES.GENERATED_ANSWER.value],
+            answer=row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value],  # TODO: ragbench golden answer should be re-considered
         )}
 
-    async def a_call_llm(self, processed: Dict) -> str:
+    async def a_call_llm(self, processed: Dict) -> Dict:
         assert 'prompt' in processed, f'Prompt missing'
-        return await self.llm.a_call_llm(processed['prompt'])
+        processed['llm_response'] = await self.llm.a_generate(processed['prompt'])
+        return processed
 
-    def post_process_row(self, response: str, row: Dict) -> Dict:
-        result = self.post_process(response)
+    def post_process_row(self, processed: Dict, row: Dict) -> Dict:
+        result = self.post_process(processed['llm_response'])
         try:
             return {key: result[key] for key in self.EVAL_COLUMNS}
         except KeyError:
@@ -347,7 +353,7 @@ class ContextRelevanceEvaluator(RAGEvaluator):
         # Execute LLM call with constructed prompt
         return self.llm.generate(processed_data)
 
-    def post_process(self, llm_response: str) -> Dict[str, float]:
+    def post_process(self, llm_response: str, **kwargs) -> Dict[str, float]:
         """Parse JSON response into scores dictionary"""
         try:
             # Clean response and parse JSON
@@ -370,6 +376,7 @@ class FactualCorrectnessEvaluator(RAGEvaluator):
     From https://arxiv.org/abs/2407.12873, Use their definition of Factual Correctness to build prompt.
     This method evaluates factual correctness of the generated answer compared to the golden (ground truth) answer.
     """
+
     def __init__(self, llm_class: type[LLMClient] = None, **llm_kwargs):
         super().__init__(llm_class, **llm_kwargs)
         self.EVAL_COLUMNS = ["TP", "FP", "FN", "F1_SCORE"]
@@ -379,20 +386,20 @@ class FactualCorrectnessEvaluator(RAGEvaluator):
         return {'prompt': self.pre_process(
             question=row[RAGBENCH_COL_NAMES.QUESTION.value],
             context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
-            answer=row[RAGBENCH_COL_NAMES.GENERATED_ANSWER.value],
+            answer=row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value],  # TODO: ragbench golden answer should be re-considered
         )}
 
-    async def a_call_llm(self, processed: Dict) -> str:
+    async def a_call_llm(self, processed: Dict) -> Dict:
         assert 'prompt' in processed, f'Prompt missing'
-        return await self.llm.a_call_llm(processed['prompt'])
+        processed['llm_response'] = await self.llm.a_generate(processed['prompt'])
+        return processed
 
-    def post_process_row(self, response: str, row: Dict) -> Dict:
-        result = self.post_process(response)
+    def post_process_row(self, processed: Dict, row: Dict) -> Dict:
+        result = self.post_process(processed['llm_response'])
         try:
             return {f"{self.EVAL_SCORE_PREFIX}_{key}": result[key] for key in self.EVAL_COLUMNS}
         except KeyError:
             return {f"{self.EVAL_SCORE_PREFIX}_{key}": None for key in self.EVAL_COLUMNS}
-
 
     def pre_process(
             self, question: str | List[str], context: str | List[str], answer: str | List[str], **kwargs
@@ -410,7 +417,7 @@ class FactualCorrectnessEvaluator(RAGEvaluator):
         # Execute LLM call with constructed prompt
         return self.llm.generate(processed_data)
 
-    def post_process(self, llm_response: str) -> Dict[str, float]:
+    def post_process(self, llm_response: str, **kwargs) -> Dict[str, float]:
         """Parse JSON response into scores dictionary"""
         try:
             # Clean response and parse JSON
@@ -458,7 +465,7 @@ class AnswerSimilarityEvaluator(RAGEvaluator):
         # Not calling an LLM. 
         pass
 
-    def post_process(self, llm_response: str) -> Dict[str, float]:
+    def post_process(self, llm_response: str, **kwargs) -> Dict[str, float]:
         # Not parsing any LLM JSON output. 
         pass
 
@@ -493,24 +500,27 @@ class KeyPointEvaluator(RAGEvaluator):
         super().__init__(llm_class, **llm_kwargs)
         self.num_key_points = 0
         self.EVAL_COLUMNS = ["completeness_score", "irrelevant_score", "hallucination_score"]
+        self.EVAL_SCORE_PREFIX = "key_point"
 
     def pre_process_row(self, row: Dict) -> Dict:
         return {'prompt': self.pre_process(
             question=row[RAGBENCH_COL_NAMES.QUESTION.value],
             context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
-            answer=row[RAGBENCH_COL_NAMES.GENERATED_ANSWER.value],
-        )}
+            answer=row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value],  # TODO: ragbench golden answer should be re-considered
+            key_points=row[RAGBENCH_COL_NAMES.KEY_POINTS.value]
+        ), "num_key_points": len(row[RAGBENCH_COL_NAMES.KEY_POINTS.value])}
 
-    async def a_call_llm(self, processed: Dict) -> str:
+    async def a_call_llm(self, processed: Dict) -> Dict:
         assert 'prompt' in processed, f'Prompt missing'
-        return await self.llm.a_call_llm(processed['prompt'])
+        processed['llm_response'] = await self.llm.a_generate(processed['prompt'])
+        return processed
 
-    def post_process_row(self, response: str, row: Dict) -> Dict:
-        result = self.post_process(response)
+    def post_process_row(self, processed: Dict, row: Dict) -> Dict:
+        result = self.post_process(llm_response=processed['llm_response'], num_key_points=processed['num_key_points'])
         try:
-            return {key: result[key] for key in self.EVAL_COLUMNS}
+            return {f"{self.EVAL_SCORE_PREFIX}_{key}": result[key] for key in self.EVAL_COLUMNS}
         except KeyError:
-            return {key: None for key in self.EVAL_COLUMNS}
+            return {f"{self.EVAL_SCORE_PREFIX}_{key}": None for key in self.EVAL_COLUMNS}
 
     def pre_process(self, question, context, answer, **kwargs):
         if "key_points" not in kwargs:
@@ -536,16 +546,17 @@ class KeyPointEvaluator(RAGEvaluator):
     def call_llm(self, processed_data):
         return self.llm.generate(processed_data)
 
-    def post_process(self, llm_response):
+    def post_process(self, llm_response, **kwargs):
+        assert "num_key_points" in kwargs, "num_key_points is missing"
         try:
             # Clean response and parse JSON
             response_text = llm_response.strip().replace('```json', '').replace('```', '')
             result = json.loads(response_text)
 
             scores = {
-                "completeness_score": len(result['complete_ids']) / self.num_key_points,
-                "irrelevant_score": len(result['irrelevant_ids']) / self.num_key_points,
-                "hallucination_score": len(result['hallucinate_ids']) / self.num_key_points,
+                "completeness_score": len(result['complete_ids']) / kwargs["num_key_points"],
+                "irrelevant_score": len(result['irrelevant_ids']) / kwargs["num_key_points"],
+                "hallucination_score": len(result['hallucinate_ids']) / kwargs["num_key_points"],
                 "raw_output": result
             }
 
@@ -560,6 +571,12 @@ class KeyPointEvaluator(RAGEvaluator):
                 "raw_output": response_text,
                 "error": str(e),
             }
+
+    def evaluate(self, answer: str | List[str] = None, question: str | List[str] = None,
+                 context: str | List[str] = None, **kwargs) -> Dict:
+        processed_data = self.pre_process(question, context, answer, **kwargs)
+        llm_response = self.call_llm(processed_data)
+        return self.post_process(llm_response, num_key_points=self.num_key_points)
 
 
 class AdherenceFaithfulnessEvaluator(RAGEvaluator):
@@ -578,15 +595,16 @@ class AdherenceFaithfulnessEvaluator(RAGEvaluator):
         return {'prompt': self.pre_process(
             question=row[RAGBENCH_COL_NAMES.QUESTION.value],
             context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
-            answer=row[RAGBENCH_COL_NAMES.GENERATED_ANSWER.value],
+            answer=row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value],  # TODO: ragbench golden answer should be re-considered
         )}
 
-    async def a_call_llm(self, processed: Dict) -> str:
+    async def a_call_llm(self, processed: Dict) -> Dict:
         assert 'prompt' in processed, f'Prompt missing'
-        return await self.llm.a_call_llm(processed['prompt'])
+        processed['llm_response'] = await self.llm.a_generate(processed['prompt'])
+        return processed
 
-    def post_process_row(self, response: str, row: Dict) -> Dict:
-        result = self.post_process(response)
+    def post_process_row(self, processed: Dict, row: Dict) -> Dict:
+        result = self.post_process(processed['llm_response'])
         try:
             return {key: result[key] for key in self.EVAL_COLUMNS}
         except KeyError:
@@ -613,7 +631,7 @@ class AdherenceFaithfulnessEvaluator(RAGEvaluator):
         """
         return self.llm.generate(processed_data)
 
-    def post_process(self, llm_response: str) -> Dict[str, float]:
+    def post_process(self, llm_response: str, **kwargs) -> Dict[str, float]:
         """
         Parse the LLM's JSON output to extract the faithfulness score.
         """
@@ -638,28 +656,29 @@ class ContextUtilizationEvaluator(RAGEvaluator):
 
     def __init__(self, llm_class: type[LLMClient] = None, **llm_kwargs):
         super().__init__(llm_class, **llm_kwargs)
-        self.context = None
+        self.context = []
         self.EVAL_COLUMNS = ["faithfulness_score", "unfaithful_segments"]
 
     def pre_process_row(self, row: Dict) -> Dict:
         return {'prompt': self.pre_process(
             question=row[RAGBENCH_COL_NAMES.QUESTION.value],
             context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
-            answer=row[RAGBENCH_COL_NAMES.GENERATED_ANSWER.value],
-        )}
+            answer=row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value],  # TODO: ragbench golden answer should be re-considered
+        ), "context": row[RAGBENCH_COL_NAMES.CONTEXT.value]}
 
-    async def a_call_llm(self, processed: Dict) -> str:
+    async def a_call_llm(self, processed: Dict) -> Dict:
         assert 'prompt' in processed, f'Prompt missing'
-        return await self.llm.a_call_llm(processed['prompt'])
+        processed['llm_response'] = await self.llm.a_generate(processed['prompt'])
+        return processed
 
-    def post_process_row(self, response: str, row: Dict) -> Dict:
-        result = self.post_process(response)
+    def post_process_row(self, processed: Dict, row: Dict) -> Dict:
+        result = self.post_process(processed['llm_response'])
         try:
             return {key: result[key] for key in self.EVAL_COLUMNS}
         except KeyError:
             return {key: None for key in self.EVAL_COLUMNS}
 
-    def pre_process(self, question, context, answer):
+    def pre_process(self, question, context, answer, **kwargs):
         self.context = context
         return EvalPromptManager().build_prompt(
             question=question,
@@ -671,13 +690,14 @@ class ContextUtilizationEvaluator(RAGEvaluator):
     def call_llm(self, processed_data):
         return self.llm.generate(processed_data)
 
-    def post_process(self, llm_response):
+    def post_process(self, llm_response, **kwargs):
+        assert "context" in kwargs, f"Missing context"
         try:
             print(f"Raw LLM response: {llm_response}")
             response_text = llm_response.strip().replace('```json', '').replace('```', '')
             result = json.loads(response_text)
 
-            context = self.context if hasattr(self, "context") else []
+            context = kwargs['context']
 
             print(f"Context: {context}")
             relevant_context = result.get("relevant_context", [])
@@ -693,3 +713,9 @@ class ContextUtilizationEvaluator(RAGEvaluator):
                 "context_utilization_score": -1,
                 'error': str(e)
             }
+
+    def evaluate(self, answer: str | List[str] = None, question: str | List[str] = None,
+                 context: str | List[str] = None, **kwargs) -> Dict:
+        processed_data = self.pre_process(question, context, answer, **kwargs)
+        llm_response = self.call_llm(processed_data)
+        return self.post_process(llm_response, context=self.context if hasattr(self, "context") else [])

@@ -33,7 +33,7 @@ class RAGEvaluator(ABC):
         async with semaphore:
             processed = self.pre_process_row(row)
             response = await self.a_call_llm(processed)
-            return self.post_process_row(response)
+            return self.post_process_row(response, row)
 
     @abstractmethod
     def pre_process_row(self, row: Dict) -> Dict:
@@ -41,11 +41,11 @@ class RAGEvaluator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def a_call_llm(self, processed: Dict) -> str:
+    async def a_call_llm(self, processed: Dict) -> Dict:
         raise NotImplementedError
 
     @abstractmethod
-    def post_process_row(self, response:str, row) -> Dict:
+    def post_process_row(self, processed: Dict, row) -> Dict:
         raise NotImplementedError
 
     @abstractmethod
@@ -79,7 +79,7 @@ class RAGEvaluator(ABC):
         pass
 
     @abstractmethod
-    def post_process(self, llm_response: str) -> Dict[str, float]:
+    def post_process(self, llm_response: str, **kwargs) -> Dict[str, float]:
         """
         Convert LLM response into evaluation scores.
         
