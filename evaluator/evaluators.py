@@ -91,7 +91,7 @@ class AnswerEquivalenceEvaluator(RAGEvaluator):
                 'error': str(e)
             }
 
-
+# TODO: implement _process_split
 class RefusalAccuracyEvaluator(RAGEvaluator):
 
     def __init__(self, llm_class: type[LLMClient] = None, **llm_kwargs):
@@ -117,7 +117,7 @@ class RefusalAccuracyEvaluator(RAGEvaluator):
         except KeyError:
             return {key: None for key in self.EVAL_COLUMNS}
 
-    def pre_process(self, question, context, answer):
+    def pre_process(self, question, context, answer, **kwargs):
         pass
 
     def call_llm(self, processed_data):
@@ -201,8 +201,8 @@ class LearningFacilitationEvaluator(RAGEvaluator):
             self,
             question: str | List[str],
             context: str | List[str],
-            answer: str | List[str]
-    ) -> str:
+            answer: str | List[str],
+            **kwargs) -> str:
         return EvalPromptManager().build_prompt(
             question=question,
             context=context,
@@ -270,8 +270,8 @@ class EngagementEvaluator(RAGEvaluator):
             self,
             question: Union[str, List[str]],
             context: Union[str, List[str]],
-            answer: Union[str, List[str]]
-    ) -> str:
+            answer: Union[str, List[str]],
+            **kwargs) -> str:
         return EvalPromptManager().build_prompt(
             question=question,
             context=context,
@@ -440,7 +440,7 @@ class FactualCorrectnessEvaluator(RAGEvaluator):
                 'error': str(e)
             }
 
-
+# TODO: implement _process_split
 class AnswerSimilarityEvaluator(RAGEvaluator):
     """
     Computes an embedding-based cosine similarity score between the generated answer and the ground-truth answer.
