@@ -395,12 +395,12 @@ class EvaluationType(BasePrompt):
     }
 
 
-class PromptManager:
+class EvalPromptManager:
     """Manages prompt construction with JSON output formatting"""
-    
+
     def __init__(self, default_type: EvaluationType = EvaluationType.RELEVANCE):
         self.default_type = default_type
-    
+
     def build_prompt(
         self,
         answer: str = None,
@@ -411,19 +411,19 @@ class PromptManager:
     ) -> str:
         """
         Construct an evaluation prompt with JSON formatting instructions
-        
+
         Args:
             question: User question/query
             context: Retrieved context used for generation
             answer: Generated answer to evaluate
             eval_type: Type of evaluation to perform
             kwargs: Additional template parameters
-            
+
         Returns:
             Formatted evaluation prompt with JSON instructions
         """
         eval_type = eval_type or self.default_type
-        
+
         return eval_type.template.format(
             question=question,
             context=context,
@@ -437,7 +437,7 @@ class PromptManager:
 # Example usage
 if __name__ == "__main__":
     # Create prompt manager with default evaluation type
-    pm = PromptManager(default_type=EvaluationType.RELEVANCE)
+    pm = EvalPromptManager(default_type=EvaluationType.RELEVANCE)
     
     # Build a relevance evaluation prompt
     question = "What causes climate change?"

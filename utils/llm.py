@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 import os
-from openai import OpenAI
+
+import aiohttp
+from openai import OpenAI, AsyncOpenAI
 import requests
 import json
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline, GenerationConfig
@@ -24,6 +26,20 @@ class LLMClient(ABC):
         """
         pass
 
+    @abstractmethod
+    async def a_generate(self, prompt: str) -> str:
+        """
+        Async execute LLM call with given prompt and return response text
+
+        Args:
+            prompt: Input text/prompt for the LLM
+
+        Returns:
+            Generated text response from LLM
+        """
+        pass
+
+
 class OpenAIClientLLM(LLMClient):
     """Concrete implementation using OpenAI-compatible client"""
     
@@ -46,6 +62,7 @@ class OpenAIClientLLM(LLMClient):
             raise ValueError("OPENAI_API_KEY environment variable required")
             
         self.client = OpenAI(api_key=api_key, base_url=base_url)
+        self.async_client = AsyncOpenAI(api_key=api_key, base_url=base_url)
         self.model = model
         self.system_message = system_message
         self.params = {
@@ -72,6 +89,20 @@ class OpenAIClientLLM(LLMClient):
         
         return completion.choices[0].message.content
 
+    async def a_generate(self, prompt: str) -> str:
+        """Execute asynchronous LLM call"""
+        messages = [
+            {"role": "system", "content": self.system_message},
+            {"role": "user", "content": prompt}
+        ]
+
+        completion = await self.async_client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            **self.params
+        )
+
+        return completion.choices[0].message.content
 class HTTPLLM(LLMClient):
     """Concrete implementation using generic HTTP API endpoint"""
     
@@ -127,6 +158,27 @@ class HTTPLLM(LLMClient):
         response.raise_for_status()
         return response.json()['choices'][0]['message']['content']
 
+    async def a_generate(self, prompt: str) -> str:
+        """Execute asynchronous HTTP request"""
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": self.system_message},
+                {"role": "user", "content": prompt}
+            ],
+            **self.params
+        }
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                    self.base_url,
+                    headers=self.headers,
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=60)
+            ) as response:
+                response.raise_for_status()
+                data = await response.json()
+                return data['choices'][0]['message']['content']
 class HFClient(LLMClient):
     """Concrete implementation for local Hugging Face models (GPU-only)"""
 
@@ -212,6 +264,8 @@ class HFClient(LLMClient):
         
         return assistant_response.strip()
 
+    async def a_generate(self, prompt):
+        raise NotImplementedError
 
 
 
