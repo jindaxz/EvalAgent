@@ -45,7 +45,7 @@ class RAGEvaluator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def post_process_row(self, processed: Dict, row) -> Dict:
+    def post_process_row(self, processed: Dict, row: Dict) -> Dict:
         raise NotImplementedError
 
     @abstractmethod

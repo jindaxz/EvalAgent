@@ -91,6 +91,7 @@ class AnswerEquivalenceEvaluator(RAGEvaluator):
                 'error': str(e)
             }
 
+
 # TODO: implement _process_split
 class RefusalAccuracyEvaluator(RAGEvaluator):
 
@@ -440,6 +441,7 @@ class FactualCorrectnessEvaluator(RAGEvaluator):
                 'error': str(e)
             }
 
+
 # TODO: implement _process_split
 class AnswerSimilarityEvaluator(RAGEvaluator):
     """
@@ -447,15 +449,24 @@ class AnswerSimilarityEvaluator(RAGEvaluator):
     Paper:Evaluation of RAG Metrics for Question Answering in the Telecom Domain,https://arxiv.org/abs/2407.12873 
     """
 
-    def __init__(self, llm, prompt_manager, model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
+    def __init__(self, model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
         """
         Args:
             llm: Pass a dummy or None, we won't use it in this evaluator.
             prompt_manager: Not used here, but required by base class signature.
             model_name: The pretrained model name to use for sentence embedding.
         """
-        super().__init__(llm, prompt_manager)
+        super().__init__()
         self.model = SentenceTransformer(model_name)
+
+    def pre_process_row(self, row: Dict) -> Dict:
+        pass
+
+    async def a_call_llm(self, processed: Dict) -> Dict:
+        pass
+
+    def post_process_row(self, processed: Dict, row: Dict) -> Dict:
+        pass
 
     def pre_process(self, question, context, answer, **kwargs):
         # No actual prompt needed. 
