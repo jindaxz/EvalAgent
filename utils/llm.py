@@ -7,7 +7,10 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline, Generati
 from huggingface_hub import login
 import torch
 import time
-from vllm import LLM
+try:
+    from vllm import LLM, SamplingParams
+except ImportError:
+    print("vllm is not installed, Please install vllm to use fast inference feature.")
 
 class LLMClient(ABC):
     """Base class for LLM clients with standardized invocation interface"""
@@ -128,6 +131,91 @@ class HTTPLLM(LLMClient):
         response.raise_for_status()
         return response.json()['choices'][0]['message']['content']
 
+
+
+class HFClientVLLM(LLMClient):
+    """Concrete implementation for local Hugging Face models with vLLM acceleration. Tested with a100 cuda 12.3, torch 2.6.0"""
+
+    def __init__(self,
+                 model_path: str,
+                 system_message: str = "You are a helpful assistant",
+                 **kwargs):
+        """
+        Initialize vLLM-accelerated Hugging Face client
+
+        Args:
+            model_path: Path or name of Hugging Face model
+            system_message: System prompt for conversation context
+            kwargs: Additional parameters for vLLM
+        """
+        # Retrieve Hugging Face token from environment variable
+        hf_token = os.getenv("HF_TOKEN")
+        if not hf_token:
+            raise ValueError("HF_TOKEN environment variable is not set")
+
+        # Authenticate with Hugging Face
+        login(token=hf_token)
+        
+        self.model_path = model_path
+        self.system_message = system_message
+        
+        # Initialize vLLM engine with optimized settings
+        self.llm = LLM(
+            model=model_path,
+            # token=hf_token,
+            trust_remote_code=True,
+            dtype="float16", # GPU compatibility issue https://github.com/vllm-project/vllm/issues/1157
+            tensor_parallel_size=torch.cuda.device_count(),
+            enforce_eager=True, # https://github.com/vllm-project/vllm/issues/2248,
+            gpu_memory_utilization=0.95,
+            max_model_len=4096,
+            **kwargs
+        )
+        
+        # Configure sampling parameters
+        self.sampling_params = SamplingParams(
+            temperature=0.7,
+            top_p=0.95,
+            max_tokens=1000,  # Equivalent to max_new_tokens
+            skip_special_tokens=True
+        )
+
+    def generate(self, prompt: str, **kwargs) -> str:
+        # Format prompt with vLLM's optimized template handling
+        if hasattr(self.llm.llm_engine.tokenizer, 'chat_template'):
+            messages = [{"role": "user", "content": prompt}]
+            formatted_prompt = self.llm.llm_engine.tokenizer.apply_chat_template(
+                messages,
+                add_generation_prompt=True
+            )
+        else:
+            formatted_prompt = f"{self.system_message}\n\nUser: {prompt}\n\nAssistant:"
+
+        # Start timing
+        start_time = time.time()
+        
+        # Use vLLM's optimized batch processing
+        outputs = self.llm.generate(
+            formatted_prompt,
+            sampling_params=self.sampling_params,
+            **kwargs
+        )
+        
+        # End timing
+        elapsed_time = time.time() - start_time
+        print(f"vLLM optimized inference time: {elapsed_time:.2f} seconds")
+        
+        # Extract and clean response
+        assistant_response = outputs[0].outputs[0].text.strip()
+        
+        # Additional DeepSeek filtering
+        if "</think>" in assistant_response:
+            idx = assistant_response.find("</think>")
+            assistant_response = assistant_response[idx + len("</think>"):].strip()
+            
+        return assistant_response
+
+
 class HFClient(LLMClient):
     """Concrete implementation for local Hugging Face models (GPU-only)"""
 
@@ -144,9 +232,9 @@ class HFClient(LLMClient):
             kwargs: Additional parameters
         """
         # Retrieve Hugging Face token from environment variable
-        hf_token = os.getenv("HUGGINGFACE_TOKEN")
+        hf_token = os.getenv("HF_TOKEN")
         if not hf_token:
-            raise ValueError("HUGGINGFACE_TOKEN environment variable is not set")
+            raise ValueError("HF_TOKEN environment variable is not set")
 
         # Authenticate with Hugging Face
         login(token=hf_token)
@@ -215,101 +303,7 @@ class HFClient(LLMClient):
 
 
 
-class VLLMClient(LLMClient):
-    """Optimized implementation using vLLM inference engine"""
-    
-    def __init__(self,
-                 model_path: str = "deepseek-ai/deepseek-r1",
-                 system_message: str = "You are a helpful and harmless assistant. Think step-by-step.",
-                 quant_method: str = "awq",
-                 **kwargs):
-        """
-        Initialize vLLM client with optimized configurations
-        
-        Args:
-            model_path: Local path or HF repo ID
-            system_message: System prompt for context
-            quant_method: Quantization method (awq, gptq, none)
-            kwargs: Additional engine parameters
-        """
-        self.model_path = model_path
-        self.system_message = system_message
-        self.quant_config = self._get_quant_config(quant_method)
-        
-        # Initialize vLLM engine with optimized params
-        self.engine = AsyncLLMEngine.from_engine_args(
-            engine_args=EngineArgs(
-                model=self.model_path,
-                quantization=self.quant_config,
-                tensor_parallel_size=torch.cuda.device_count(),
-                max_model_len=16384,
-                enforce_eager=True,  # Bypass graph capture for dynamic inputs
-                **kwargs
-            )
-        )
-        
-        self.generation_config = {
-            "max_tokens": 32000,
-            "temperature": 0.7,
-            "top_p": 0.95,
-            "frequency_penalty": 0.5
-        }
 
-    def _get_quant_config(self, method: str):
-        """Configure quantization method"""
-        if method == "awq":
-            return AWQConfig(quant_method="awq")
-        elif method == "gptq":
-            return GPTQConfig(bits=4, group_size=128)
-        return None
-
-    async def generate(self, prompt: str, **kwargs) -> str:
-        """Execute optimized generation with vLLM"""
-        sampling_params = SamplingParams(
-            **{**self.generation_config, **kwargs}
-        )
-        
-        # Format messages with system prompt
-        messages = [
-            {"role": "system", "content": self.system_message},
-            {"role": "user", "content": prompt}
-        ]
-        
-        # Use vLLM's optimized tokenizer
-        tokenizer = self.engine.engine.tokenizer
-        if hasattr(tokenizer, "apply_chat_template"):
-            formatted_prompt = tokenizer.apply_chat_template(
-                messages,
-                add_generation_prompt=True,
-                tokenize=False
-            )
-        else:
-            formatted_prompt = f"{self.system_message}\n\nUser: {prompt}\nAssistant:"
-
-        # Async streaming generation
-        results_generator = self.engine.generate(
-            formatted_prompt, 
-            sampling_params,
-            request_id=uuid.uuid4().hex
-        )
-
-        # Collect output
-        async for request_output in results_generator:
-            return request_output.outputs[0].text
-
-    def batch_generate(self, prompts: List[str], **kwargs) -> List[str]:
-        """Optimized batch processing with continuous batching"""
-        sampling_params = SamplingParams(
-            **{**self.generation_config, **kwargs}
-        )
-        
-        outputs = self.engine.generate_batch(
-            prompts,
-            sampling_params=sampling_params,
-            use_tqdm=False
-        )
-        
-        return [output.outputs[0].text for output in outputs]
 
 
 
