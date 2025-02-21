@@ -1,23 +1,6 @@
 from enum import Enum, auto
 from typing import Dict, Any
-
-class BasePrompt(Enum):
-    """Base class for prompt enums with template and output formatting"""
-    @property
-    def template(self) -> str:
-        return self.value['template']
-    
-    @property
-    def criteria(self) -> str:
-        return self.value.get('criteria', '')
-    
-    @property
-    def formatter(self) -> str:
-        return self.value['formatter']
-    
-    @classmethod
-    def get_prompt_type(cls, name: str) -> 'BasePrompt':
-        return cls[name.upper()]
+from utils.base import BasePrompt
 
 class EvaluationType(BasePrompt):
     """Enumeration of different evaluation prompt types with JSON formatting"""
@@ -383,12 +366,12 @@ class EvaluationType(BasePrompt):
     }
 
 
-class PromptManager:
+class EvalPromptManager:
     """Manages prompt construction with JSON output formatting"""
-    
+
     def __init__(self, default_type: EvaluationType = EvaluationType.RELEVANCE):
         self.default_type = default_type
-    
+
     def build_prompt(
         self,
         answer: str = None,
@@ -399,19 +382,19 @@ class PromptManager:
     ) -> str:
         """
         Construct an evaluation prompt with JSON formatting instructions
-        
+
         Args:
             question: User question/query
             context: Retrieved context used for generation
             answer: Generated answer to evaluate
             eval_type: Type of evaluation to perform
             kwargs: Additional template parameters
-            
+
         Returns:
             Formatted evaluation prompt with JSON instructions
         """
         eval_type = eval_type or self.default_type
-        
+
         return eval_type.template.format(
             question=question,
             context=context,
@@ -425,7 +408,7 @@ class PromptManager:
 # Example usage
 if __name__ == "__main__":
     # Create prompt manager with default evaluation type
-    pm = PromptManager(default_type=EvaluationType.RELEVANCE)
+    pm = EvalPromptManager(default_type=EvaluationType.RELEVANCE)
     
     # Build a relevance evaluation prompt
     question = "What causes climate change?"

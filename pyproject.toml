@@ -7,15 +7,30 @@ readme = "README.md"
 packages = [{include = "evaluator"}]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.9"
 openai = "^1.12.0"
 requests = "^2.31.0"
 datasets = "^2.16.1"
 python-dotenv = "^1.0.0"
 ipykernel = "^6.19.0"
+huggingface-hub = "^0.28"
+transformers = "^4.48"
+# CPU version will be installed by default from PyPI
+torch = { version = ">=2.1.2", optional = true }
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.29.5"
+
+# Add PyTorch CUDA repository as a source
+[[tool.poetry.source]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu121"
+priority = "explicit"
+
+# Define optional GPU dependency (same package name but different source)
+[tool.poetry.extras]
+cpu = ["torch"]
+gpu = ["torch"]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
