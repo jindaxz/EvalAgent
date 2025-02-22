@@ -1,9 +1,10 @@
 import json
+from random import random
 from typing import Dict, List
 
 from data_annotator.base_annotator import DataAnnotator
 from data_annotator.prompt_manager import AnnotationType, AnnotatePromptManager
-from utils.constants import RAGBENCH_COL_NAMES, LLM_RESPONSE, PROMPT
+from utils.constants import RAGBENCH_COL_NAMES, LLM_RESPONSE, PROMPT, SYNTHETIC_MISTAKE_TYPES
 from utils.llm import LLMClient
 
 import numpy as np
@@ -46,34 +47,110 @@ class KeyPointAnnotator(DataAnnotator):
 
 
 class NumMistakesAnnotator(DataAnnotator):
-    def __init__(self, mistakes: List[str]):
-        self.mistakes = mistakes
+    def __init__(self):
         super().__init__()
 
     def pre_process(self, row: Dict) -> Dict:
         pass
 
-    async def a_call_llm(self, processed: Dict) -> str:
+    async def a_call_llm(self, processed: Dict) -> Dict:
         pass
 
-    def post_process(self, processed: str, row: Dict) -> Dict:
+    def post_process(self, processed: Dict, row: Dict) -> Dict:
         np.random.seed(42)
-        return {mistake: np.random.choice(3, p=[0.7, 0.2, 0.1]) for mistake in self.mistakes}
+        return {'num_mistake': np.random.choice(3, p=[0.5, 0.3, 0.2])}
+
+
+class MistakeDistributionAnnotator(DataAnnotator):
+    def __init__(self):
+        super().__init__()
+        self.mistake_type = SYNTHETIC_MISTAKE_TYPES
+
+    def pre_process(self, row: Dict) -> Dict:
+        return {
+            PROMPT: AnnotatePromptManager().build_prompt(
+                question=row[RAGBENCH_COL_NAMES.QUESTION.value],
+                golden_answer=row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value],
+                eval_type=AnnotationType.HAS_NUMERIC_INFO,
+            )
+        }
+
+    async def a_call_llm(self, processed: Dict) -> Dict:
+        processed[LLM_RESPONSE] = await self.a_call_llm(processed[PROMPT])
+
+    def post_process(self, processed: Dict, row: Dict) -> Dict:
+        try:
+            # Clean response and parse JSON
+            response_text = processed[LLM_RESPONSE].strip().replace("```json", "").replace("```", "")
+            result = json.loads(response_text)
+            if result["has_numeric_info"] == 'True':
+                return {"mistake_distribution": self._distribute(True, row)}
+            else:
+                return {"mistake_distribution": self._distribute(False, row)}
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Error parsing LLM response for row{row['id']}: {response_text}")
+            return {"mistake_distribution": self._distribute(False, row)}
+
+    def _distribute(self, has_numeric: bool, row: Dict) -> List:
+        if has_numeric:
+            counts = [0] * len(self.mistake_type)
+
+            for _ in range(row["num_mistake"] - 1):
+                # Randomly select a mistake type index
+                idx = np.random.randint(0, len(self.mistake_type) - 2, 1)
+                counts[idx] += 1
+
+            counts[-1] = 1
+            return list(zip(self.mistake_type, counts))
+        else:
+            counts = [0] * (len(self.mistake_type) - 1)
+
+            for _ in range(row["num_mistake"]):
+                # Randomly select a mistake type index
+                idx = np.random.randint(0, len(self.mistake_type) - 2, 1)
+                counts[idx] += 1
+            return list(zip(self.mistake_type, counts))
 
 
 class MistakeAnswerGenerator(DataAnnotator):
-    def __init__(self, llm_class: type[LLMClient], mistakes: List[str]):
+    def __init__(self, llm_class: type[LLMClient]):
         super().__init__(llm_class=llm_class)
-        self.mistakes = mistakes
+
+    def _pre_process_mistakes(self, mistake_distribution: list) -> str:
+        """Convert mistake distribution list into instruction string"""
+        errors = []
+        for error_type, count in mistake_distribution:
+            errors.extend([error_type] * count)
+
+        return "\n".join([f"{i + 1}. Introduce a {error} error"
+                          for i, error in enumerate(errors)])
 
     def pre_process(self, row: Dict) -> Dict:
-        pass
+        processed_mistakes = self._pre_process_mistakes(row['mistake_distribution'])
+
+        return {PROMPT: AnnotatePromptManager().build_prompt(
+            answer=row[RAGBENCH_COL_NAMES.GENERATED_ANSWER.value],
+            context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
+            criteria=AnnotationType.MISTAKE_GENERATION.criteria(processed_mistakes)
+        )
+        }
 
     async def a_call_llm(self, processed: Dict) -> Dict:
         return await self.llm.a_generate(processed=processed[PROMPT])
 
     def post_process(self, processed: Dict, row: Dict) -> Dict:
-        pass
+        try:
+            # Clean response and parse JSON
+            response_text = processed[LLM_RESPONSE].strip().replace("```json", "").replace("```", "")
+            result = json.loads(response_text)
+            return {"Paraphrased": result["Paraphrased"],
+                    "Incorrect": result["Incorrect"],
+                    "Error_Locations": result["Error_Locations"]}
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Error parsing LLM response for row{row['id']}: {response_text}")
+            return {"Paraphrased": None,
+                    "Incorrect": None,
+                    "Error_Locations": []}
 
 
 class MistakeAnswerScoringAnnotator(DataAnnotator):
