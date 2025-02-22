@@ -6,6 +6,12 @@ PROMPT = "prompt"
 
 SYNTHETIC_MISTAKE_TYPES = ['Entity_Error', 'Negation', 'Missing_Information', 'Out_of_Reference', 'Numerical_Error']
 
+EVAL_COL_MAP = {
+    "Correct": "Paraphrased",
+    "Incorrect": "Incorrect",
+    "gold": "generated_answer",
+}
+
 class RAGBENCH_COL_NAMES(Enum):
     GOLDEN_ANSWER = "response"
     QUESTION = "question"

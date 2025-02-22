@@ -6,7 +6,8 @@ from evaluator.prompt_manager import EvaluationType, EvalPromptManager
 from sentence_transformers import SentenceTransformer, util
 
 from utils.llm import LLMClient
-from utils.constants import RAGBENCH_COL_NAMES, LLM_RESPONSE, PROMPT
+from utils.constants import RAGBENCH_COL_NAMES, LLM_RESPONSE, PROMPT, EVAL_COL_MAP
+import os
 
 
 # TODO: add AnswerEquivalenceEvaluatorWithBert
@@ -19,13 +20,20 @@ class AnswerEquivalenceEvaluator(RAGEvaluator):
     def __init__(self, llm_class: type[LLMClient] = None, **llm_kwargs):
         super().__init__(llm_class, **llm_kwargs)
         self.EVAL_COLUMNS = ["equivalence"]
+        self.EVAL_SCORE_PREFIX = ""
+        assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
+        self.answer_column = os.getenv("ANSWER_TYPE")
+        if self.EVAL_SCORE_PREFIX:
+            self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
+        else:
+            self.EVAL_SCORE_PREFIX = self.answer_column
 
     def pre_process_row(self, row: Dict) -> Dict:
         return {PROMPT: self.pre_process(
             question=row[RAGBENCH_COL_NAMES.QUESTION.value],
             context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
-            answer=row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value],  # TODO: ragbench golden answer should be re-considered
-            gold_answer=row[RAGBENCH_COL_NAMES.GENERATED_ANSWER.value]
+            answer=row[EVAL_COL_MAP[self.answer_column]],  
+            golden_answer=row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value]
         )}
 
     async def a_call_llm(self, processed: Dict) -> Dict:
@@ -36,9 +44,9 @@ class AnswerEquivalenceEvaluator(RAGEvaluator):
     def post_process_row(self, processed: Dict, row: Dict) -> Dict:
         result = self.post_process(processed[LLM_RESPONSE])
         try:
-            return {key: result[key] for key in self.EVAL_COLUMNS}
+            return {f"{self.EVAL_SCORE_PREFIX}_{key}": result[key] for key in self.EVAL_COLUMNS}
         except KeyError:
-            return {key: None for key in self.EVAL_COLUMNS}
+            return {f"{self.EVAL_SCORE_PREFIX}_{key}": None for key in self.EVAL_COLUMNS}
 
     def pre_process(
             self,
@@ -98,12 +106,18 @@ class RefusalAccuracyEvaluator(RAGEvaluator):
     def __init__(self, llm_class: type[LLMClient] = None, **llm_kwargs):
         super().__init__(llm_class, **llm_kwargs)
         self.EVAL_COLUMNS = ["refusal_accuracy"]
-
+        assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
+        self.answer_column = os.getenv("ANSWER_TYPE")
+        self.EVAL_SCORE_PREFIX = ""
+        if self.EVAL_SCORE_PREFIX:
+            self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
+        else:
+            self.EVAL_SCORE_PREFIX = self.answer_column
     def pre_process_row(self, row: Dict) -> Dict:
         return {PROMPT: self.pre_process(
             question=row[RAGBENCH_COL_NAMES.QUESTION.value],
             context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
-            answer=row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value],  # TODO: ragbench golden answer should be re-considered
+            answer=row[EVAL_COL_MAP[self.answer_column]],  
         )}
 
     async def a_call_llm(self, processed: Dict) -> Dict:
@@ -114,9 +128,9 @@ class RefusalAccuracyEvaluator(RAGEvaluator):
     def post_process_row(self, processed: Dict, row: Dict) -> Dict:
         result = self.post_process(processed[LLM_RESPONSE])
         try:
-            return {key: result[key] for key in self.EVAL_COLUMNS}
+            return {f"{self.EVAL_SCORE_PREFIX}_{key}": result[key] for key in self.EVAL_COLUMNS}
         except KeyError:
-            return {key: None for key in self.EVAL_COLUMNS}
+            return {f"{self.EVAL_SCORE_PREFIX}_{key}": None for key in self.EVAL_COLUMNS}
 
     def pre_process(self, question, context, answer, **kwargs):
         pass
@@ -178,12 +192,18 @@ class LearningFacilitationEvaluator(RAGEvaluator):
     def __init__(self, llm_class: type[LLMClient] = None, **llm_kwargs):
         super().__init__(llm_class, **llm_kwargs)
         self.EVAL_COLUMNS = ["learning_facilitation_score", "educational_strengths", "areas_for_improvement"]
-
+        assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
+        self.answer_column = os.getenv("ANSWER_TYPE")
+        self.EVAL_SCORE_PREFIX = ""
+        if self.EVAL_SCORE_PREFIX:
+            self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
+        else:
+            self.EVAL_SCORE_PREFIX = self.answer_column
     def pre_process_row(self, row: Dict) -> Dict:
         return {PROMPT: self.pre_process(
             question=row[RAGBENCH_COL_NAMES.QUESTION.value],
             context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
-            answer=row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value],  # TODO: ragbench golden answer should be re-considered
+            answer=row[EVAL_COL_MAP[self.answer_column]],  
         )}
 
     async def a_call_llm(self, processed: Dict) -> Dict:
@@ -194,9 +214,9 @@ class LearningFacilitationEvaluator(RAGEvaluator):
     def post_process_row(self, processed: Dict, row: Dict) -> Dict:
         result = self.post_process(processed[LLM_RESPONSE])
         try:
-            return {key: result[key] for key in self.EVAL_COLUMNS}
+            return {f"{self.EVAL_SCORE_PREFIX}_{key}": result[key] for key in self.EVAL_COLUMNS}
         except KeyError:
-            return {key: None for key in self.EVAL_COLUMNS}
+            return {f"{self.EVAL_SCORE_PREFIX}_{key}": None for key in self.EVAL_COLUMNS}
 
     def pre_process(
             self,
@@ -247,12 +267,18 @@ class EngagementEvaluator(RAGEvaluator):
     def __init__(self, llm_class: type[LLMClient] = None, **llm_kwargs):
         super().__init__(llm_class, **llm_kwargs)
         self.EVAL_COLUMNS = ["engagement_score", "engaging_elements", "suggestions_for_improvement"]
-
+        assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
+        self.answer_column = os.getenv("ANSWER_TYPE")
+        self.EVAL_SCORE_PREFIX = ""
+        if self.EVAL_SCORE_PREFIX:
+            self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
+        else:
+            self.EVAL_SCORE_PREFIX = self.answer_column
     def pre_process_row(self, row: Dict) -> Dict:
         return {PROMPT: self.pre_process(
             question=row[RAGBENCH_COL_NAMES.QUESTION.value],
             context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
-            answer=row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value],  # TODO: ragbench golden answer should be re-considered
+            answer=row[EVAL_COL_MAP[self.answer_column]],  
         )}
 
     async def a_call_llm(self, processed: Dict) -> Dict:
@@ -263,9 +289,9 @@ class EngagementEvaluator(RAGEvaluator):
     def post_process_row(self, processed: Dict, row: Dict) -> Dict:
         result = self.post_process(processed[LLM_RESPONSE])
         try:
-            return {key: result[key] for key in self.EVAL_COLUMNS}
+            return {f"{self.EVAL_SCORE_PREFIX}_{key}": result[key] for key in self.EVAL_COLUMNS}
         except KeyError:
-            return {key: None for key in self.EVAL_COLUMNS}
+            return {f"{self.EVAL_SCORE_PREFIX}_{key}": None for key in self.EVAL_COLUMNS}
 
     def pre_process(
             self,
@@ -321,12 +347,19 @@ class ContextRelevanceEvaluator(RAGEvaluator):
     def __init__(self, llm_class: type[LLMClient] = None, **llm_kwargs):
         super().__init__(llm_class, **llm_kwargs)
         self.EVAL_COLUMNS = ["relevance_score"]
-
+        assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
+        self.answer_column = os.getenv("ANSWER_TYPE")
+        self.EVAL_SCORE_PREFIX = ""
+        if self.EVAL_SCORE_PREFIX:
+            self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
+        else:
+            self.EVAL_SCORE_PREFIX = self.answer_column
     def pre_process_row(self, row: Dict) -> Dict:
+        assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
         return {PROMPT: self.pre_process(
             question=row[RAGBENCH_COL_NAMES.QUESTION.value],
             context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
-            answer=row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value],  # TODO: ragbench golden answer should be re-considered
+            answer=row[EVAL_COL_MAP[self.answer_column]],  
         )}
 
     async def a_call_llm(self, processed: Dict) -> Dict:
@@ -337,9 +370,9 @@ class ContextRelevanceEvaluator(RAGEvaluator):
     def post_process_row(self, processed: Dict, row: Dict) -> Dict:
         result = self.post_process(processed[LLM_RESPONSE])
         try:
-            return {key: result[key] for key in self.EVAL_COLUMNS}
+            return {f"{self.EVAL_SCORE_PREFIX}_{key}": result[key] for key in self.EVAL_COLUMNS}
         except KeyError:
-            return {key: None for key in self.EVAL_COLUMNS}
+            return {f"{self.EVAL_SCORE_PREFIX}_{key}": None for key in self.EVAL_COLUMNS}
 
     def pre_process(
             self, question: str | List[str], context: str | List[str], answer: str | List[str], **kwargs
@@ -382,12 +415,19 @@ class FactualCorrectnessEvaluator(RAGEvaluator):
         super().__init__(llm_class, **llm_kwargs)
         self.EVAL_COLUMNS = ["TP", "FP", "FN", "F1_SCORE"]
         self.EVAL_SCORE_PREFIX = "factual_correctness"
-
+        assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
+        self.answer_column = os.getenv("ANSWER_TYPE")
+        self.EVAL_SCORE_PREFIX = ""
+        if self.EVAL_SCORE_PREFIX:
+            self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
+        else:
+            self.EVAL_SCORE_PREFIX = self.answer_column
     def pre_process_row(self, row: Dict) -> Dict:
+        assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
         return {PROMPT: self.pre_process(
             question=row[RAGBENCH_COL_NAMES.QUESTION.value],
             context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
-            answer=row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value],  # TODO: ragbench golden answer should be re-considered
+            answer=row[EVAL_COL_MAP[self.answer_column]],  
         )}
 
     async def a_call_llm(self, processed: Dict) -> Dict:
@@ -458,7 +498,14 @@ class AnswerSimilarityEvaluator(RAGEvaluator):
         """
         super().__init__()
         self.model = SentenceTransformer(model_name)
-
+        self.prompt_manager = ""
+        assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
+        self.answer_column = os.getenv("ANSWER_TYPE")
+        self.EVAL_SCORE_PREFIX = ""
+        if self.EVAL_SCORE_PREFIX:
+            self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
+        else:
+            self.EVAL_SCORE_PREFIX = self.answer_column
     def pre_process_row(self, row: Dict) -> Dict:
         pass
 
@@ -512,12 +559,17 @@ class KeyPointEvaluator(RAGEvaluator):
         self.num_key_points = 0
         self.EVAL_COLUMNS = ["completeness_score", "irrelevant_score", "hallucination_score"]
         self.EVAL_SCORE_PREFIX = "key_point"
-
+        assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
+        self.answer_column = os.getenv("ANSWER_TYPE")
+        if self.EVAL_SCORE_PREFIX:
+            self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
+        else:
+            self.EVAL_SCORE_PREFIX = self.answer_column
     def pre_process_row(self, row: Dict) -> Dict:
         return {PROMPT: self.pre_process(
             question=row[RAGBENCH_COL_NAMES.QUESTION.value],
             context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
-            answer=row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value],  # TODO: ragbench golden answer should be re-considered
+            answer=row[EVAL_COL_MAP[self.answer_column]],  
             key_points=row[RAGBENCH_COL_NAMES.KEY_POINTS.value]
         ), "num_key_points": len(row[RAGBENCH_COL_NAMES.KEY_POINTS.value])}
 
@@ -601,12 +653,18 @@ class AdherenceFaithfulnessEvaluator(RAGEvaluator):
     def __init__(self, llm_class: type[LLMClient] = None, **llm_kwargs):
         super().__init__(llm_class, **llm_kwargs)
         self.EVAL_COLUMNS = ["faithfulness_score", "unfaithful_segments"]
-
+        assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
+        self.answer_column = os.getenv("ANSWER_TYPE")
+        self.EVAL_SCORE_PREFIX = ""
+        if self.EVAL_SCORE_PREFIX:
+            self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
+        else:
+            self.EVAL_SCORE_PREFIX = self.answer_column
     def pre_process_row(self, row: Dict) -> Dict:
         return {PROMPT: self.pre_process(
             question=row[RAGBENCH_COL_NAMES.QUESTION.value],
             context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
-            answer=row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value],  # TODO: ragbench golden answer should be re-considered
+            answer=row[EVAL_COL_MAP[self.answer_column]],  
         )}
 
     async def a_call_llm(self, processed: Dict) -> Dict:
@@ -617,9 +675,9 @@ class AdherenceFaithfulnessEvaluator(RAGEvaluator):
     def post_process_row(self, processed: Dict, row: Dict) -> Dict:
         result = self.post_process(processed[LLM_RESPONSE])
         try:
-            return {key: result[key] for key in self.EVAL_COLUMNS}
+            return {f"{self.EVAL_SCORE_PREFIX}_{key}": result[key] for key in self.EVAL_COLUMNS}
         except KeyError:
-            return {key: None for key in self.EVAL_COLUMNS}
+            return {f"{self.EVAL_SCORE_PREFIX}_{key}": None for key in self.EVAL_COLUMNS}
 
     def pre_process(
             self,
@@ -669,12 +727,18 @@ class ContextUtilizationEvaluator(RAGEvaluator):
         super().__init__(llm_class, **llm_kwargs)
         self.context = []
         self.EVAL_COLUMNS = ["faithfulness_score", "unfaithful_segments"]
-
+        assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
+        self.answer_column = os.getenv("ANSWER_TYPE")
+        self.EVAL_SCORE_PREFIX = ""
+        if self.EVAL_SCORE_PREFIX:
+            self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
+        else:
+            self.EVAL_SCORE_PREFIX = self.answer_column
     def pre_process_row(self, row: Dict) -> Dict:
         return {PROMPT: self.pre_process(
             question=row[RAGBENCH_COL_NAMES.QUESTION.value],
             context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
-            answer=row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value],  # TODO: ragbench golden answer should be re-considered
+            answer=row[EVAL_COL_MAP[self.answer_column]],  
         ), "context": row[RAGBENCH_COL_NAMES.CONTEXT.value]}
 
     async def a_call_llm(self, processed: Dict) -> Dict:
@@ -685,9 +749,9 @@ class ContextUtilizationEvaluator(RAGEvaluator):
     def post_process_row(self, processed: Dict, row: Dict) -> Dict:
         result = self.post_process(processed[LLM_RESPONSE])
         try:
-            return {key: result[key] for key in self.EVAL_COLUMNS}
+            return {f"{self.EVAL_SCORE_PREFIX}_{key}": result[key] for key in self.EVAL_COLUMNS}
         except KeyError:
-            return {key: None for key in self.EVAL_COLUMNS}
+            return {f"{self.EVAL_SCORE_PREFIX}_{key}": None for key in self.EVAL_COLUMNS}
 
     def pre_process(self, question, context, answer, **kwargs):
         self.context = context
