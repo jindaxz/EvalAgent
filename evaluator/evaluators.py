@@ -413,7 +413,7 @@ class FactualCorrectnessEvaluator(RAGEvaluator):
 
     def __init__(self, llm_class: type[LLMClient] = None, **llm_kwargs):
         super().__init__(llm_class, **llm_kwargs)
-        self.EVAL_COLUMNS = ["TP", "FP", "FN", "F1_SCORE"]
+        self.EVAL_COLUMNS = ["TP", "FP", "FN", "F1_score"]
         self.EVAL_SCORE_PREFIX = "factual_correctness"
         assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
         self.answer_column = os.getenv("ANSWER_TYPE")
@@ -427,7 +427,9 @@ class FactualCorrectnessEvaluator(RAGEvaluator):
         return {PROMPT: self.pre_process(
             question=row[RAGBENCH_COL_NAMES.QUESTION.value],
             context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
-            answer=row[EVAL_COL_MAP[self.answer_column]],  
+            answer=row[EVAL_COL_MAP[self.answer_column]],
+            golden_answer=row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value],
+            eval_type=EvaluationType.FACTUAL_CORRECTNESS,
         )}
 
     async def a_call_llm(self, processed: Dict) -> Dict:

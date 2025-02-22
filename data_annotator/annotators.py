@@ -167,6 +167,7 @@ class MistakeAnswerGenerator(DataAnnotator):
                     "Error_Locations": []}
 
 
+# TODO discuss if we still need this, we can use a stronger model to direct get mistake answer standard score
 class MistakeAnswerScoringAnnotator(DataAnnotator):
     def __init__(self, scores: List[str]):
         self.scores = scores
