@@ -47,8 +47,12 @@ class KeyPointAnnotator(DataAnnotator):
 
 
 class NumMistakesAnnotator(DataAnnotator):
-    def __init__(self):
-        super().__init__()
+    def __init__(
+            self,
+            llm_class: type[LLMClient] = None,
+            **llm_kwargs,
+    ):
+        super().__init__(llm_class, **llm_kwargs)
 
     def pre_process(self, row: Dict) -> Dict:
         pass
@@ -58,12 +62,16 @@ class NumMistakesAnnotator(DataAnnotator):
 
     def post_process(self, processed: Dict, row: Dict) -> Dict:
         np.random.seed(42)
-        return {'num_mistake': np.random.choice(3, p=[0.5, 0.3, 0.2])}
+        return {'num_mistake': np.random.choice(3, p=[0.0, 0.7, 0.3])}
 
 
 class MistakeDistributionAnnotator(DataAnnotator):
-    def __init__(self):
-        super().__init__()
+    def __init__(
+            self,
+            llm_class: type[LLMClient] = None,
+            **llm_kwargs,
+    ):
+        super().__init__(llm_class, **llm_kwargs)
         self.mistake_type = SYNTHETIC_MISTAKE_TYPES
 
     def pre_process(self, row: Dict) -> Dict:
@@ -76,7 +84,8 @@ class MistakeDistributionAnnotator(DataAnnotator):
         }
 
     async def a_call_llm(self, processed: Dict) -> Dict:
-        processed[LLM_RESPONSE] = await self.a_call_llm(processed[PROMPT])
+        processed[LLM_RESPONSE] = await self.llm.a_generate(processed[PROMPT])
+        return processed
 
     def post_process(self, processed: Dict, row: Dict) -> Dict:
         try:
@@ -96,47 +105,52 @@ class MistakeDistributionAnnotator(DataAnnotator):
             counts = [0] * len(self.mistake_type)
 
             for _ in range(row["num_mistake"] - 1):
-                # Randomly select a mistake type index
-                idx = np.random.randint(0, len(self.mistake_type) - 2, 1)
+                idx = np.random.randint(0, len(self.mistake_type) - 2, 1)[0]
                 counts[idx] += 1
 
             counts[-1] = 1
-            return list(zip(self.mistake_type, counts))
+            return [json.dumps(inner) for inner in zip(self.mistake_type, counts)]
         else:
             counts = [0] * (len(self.mistake_type) - 1)
 
             for _ in range(row["num_mistake"]):
-                # Randomly select a mistake type index
-                idx = np.random.randint(0, len(self.mistake_type) - 2, 1)
+                idx = np.random.randint(0, len(self.mistake_type) - 2, 1)[0]
                 counts[idx] += 1
-            return list(zip(self.mistake_type, counts))
+            return [json.dumps(inner) for inner in zip(self.mistake_type, counts)]
 
 
 class MistakeAnswerGenerator(DataAnnotator):
-    def __init__(self, llm_class: type[LLMClient]):
-        super().__init__(llm_class=llm_class)
+    def __init__(
+            self,
+            llm_class: type[LLMClient] = None,
+            **llm_kwargs,
+    ):
+        super().__init__(llm_class, **llm_kwargs)
 
     def _pre_process_mistakes(self, mistake_distribution: list) -> str:
         """Convert mistake distribution list into instruction string"""
+        mistake_distribution = [tuple(json.loads(item)) for item in mistake_distribution]
         errors = []
         for error_type, count in mistake_distribution:
             errors.extend([error_type] * count)
 
-        return "\n".join([f"{i + 1}. Introduce a {error} error"
+        return "\n".join([f"{i + 1}. Introduce a {error} error in only one place"
                           for i, error in enumerate(errors)])
 
     def pre_process(self, row: Dict) -> Dict:
         processed_mistakes = self._pre_process_mistakes(row['mistake_distribution'])
 
         return {PROMPT: AnnotatePromptManager().build_prompt(
-            answer=row[RAGBENCH_COL_NAMES.GENERATED_ANSWER.value],
+            golden_answer=row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value],
             context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
-            criteria=AnnotationType.MISTAKE_GENERATION.criteria(processed_mistakes)
+            criteria_result=AnnotationType.MISTAKE_GENERATION.criteria(processed_mistakes),
+            eval_type=AnnotationType.MISTAKE_GENERATION
         )
         }
 
     async def a_call_llm(self, processed: Dict) -> Dict:
-        return await self.llm.a_generate(processed=processed[PROMPT])
+        processed[LLM_RESPONSE] = await self.llm.a_generate(processed[PROMPT])
+        return processed
 
     def post_process(self, processed: Dict, row: Dict) -> Dict:
         try:

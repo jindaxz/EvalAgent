@@ -87,11 +87,11 @@ Example:\n
         - A perfect paraphrase maintaining all details
         - An incorrect version with specific errors
     
-        Ground Truth Answer: {answer}
+        Ground Truth Answer: {golden_answer}
         Context: {context}
     
         Follow these criteria:
-        {criteria}
+        {criteria_result}
     
         {formatter}""",
 
@@ -155,7 +155,7 @@ class AnnotatePromptManager:
             context=context,
             answer=answer,
             examples=eval_type.examples,
-            criteria=kwargs.get('criteria', eval_type.criteria),
+            criteria=eval_type.criteria,
             formatter=eval_type.formatter,
             **kwargs
         )

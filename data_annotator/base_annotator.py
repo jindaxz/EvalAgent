@@ -29,8 +29,8 @@ class DataAnnotator(ABC):
         """
         async with semaphore:
             processed = self.pre_process(row)
-            response = await self.a_call_llm(processed)
-            return self.post_process(response, row)
+            processed = await self.a_call_llm(processed)
+            return self.post_process(processed, row)
 
     @abstractmethod
     def pre_process(self, row: Dict) -> Dict:
