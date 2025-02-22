@@ -57,3 +57,6 @@ if __name__ == "__main__":
     meta_scores = meta_reviewer.get_meta_scores(
         question, context, answer, score1, reason1, score2, reason2)
     print(meta_scores)
+
+
+# {'meta_score': 0.75, 'reasons': ['The answer provides accurate information but lacks elements to promote further inquiry', 'The explanation is clear but minimal, focusing solely on the factual answer', 'Reviewers agree on clarity but differ on the need for additional depth and interactive elements']}
