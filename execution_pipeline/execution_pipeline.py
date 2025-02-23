@@ -1,3 +1,4 @@
+from __future__ import annotations  # https://stackoverflow.com/questions/76712720/typeerror-unsupported-operand-types-for-type-and-nonetype
 import asyncio
 from typing import List, Dict, Optional
 from concurrent.futures import ProcessPoolExecutor

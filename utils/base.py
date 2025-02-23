@@ -1,3 +1,4 @@
+from __future__ import annotations  # https://stackoverflow.com/questions/76712720/typeerror-unsupported-operand-types-for-type-and-nonetype
 from enum import Enum
 
 
