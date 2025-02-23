@@ -1,5 +1,7 @@
+from __future__ import annotations
 from enum import Enum
 from typing import Callable
+
 
 class BasePrompt(Enum):
     """Base class for prompt enums with template and output formatting"""

@@ -1,3 +1,4 @@
+from __future__ import annotations
 import json
 from random import random
 from typing import Dict, List
@@ -61,7 +62,6 @@ class NumMistakesAnnotator(DataAnnotator):
         pass
 
     def post_process(self, processed: Dict, row: Dict) -> Dict:
-        np.random.seed(42)
         return {'num_mistake': np.random.choice(3, p=[0.0, 0.7, 0.3])}
 
 
@@ -92,7 +92,7 @@ class MistakeDistributionAnnotator(DataAnnotator):
             # Clean response and parse JSON
             response_text = processed[LLM_RESPONSE].strip().replace("```json", "").replace("```", "")
             result = json.loads(response_text)
-            if result["has_numeric_info"] == 'True':
+            if result["has_numeric_info"].lower() == 'true':
                 return {"mistake_distribution": self._distribute(True, row)}
             else:
                 return {"mistake_distribution": self._distribute(False, row)}
@@ -101,7 +101,7 @@ class MistakeDistributionAnnotator(DataAnnotator):
             return {"mistake_distribution": self._distribute(False, row)}
 
     def _distribute(self, has_numeric: bool, row: Dict) -> List:
-        if has_numeric:
+        if has_numeric and np.random.choice([True, False], p=[0.75, 0.25]):
             counts = [0] * len(self.mistake_type)
 
             for _ in range(row["num_mistake"] - 1):
@@ -111,11 +111,12 @@ class MistakeDistributionAnnotator(DataAnnotator):
             counts[-1] = 1
             return [json.dumps(inner) for inner in zip(self.mistake_type, counts)]
         else:
-            counts = [0] * (len(self.mistake_type) - 1)
+            counts = [0] * (len(self.mistake_type))
 
             for _ in range(row["num_mistake"]):
                 idx = np.random.randint(0, len(self.mistake_type) - 2, 1)[0]
                 counts[idx] += 1
+
             return [json.dumps(inner) for inner in zip(self.mistake_type, counts)]
 
 

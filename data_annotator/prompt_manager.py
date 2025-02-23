@@ -1,3 +1,4 @@
+from __future__ import annotations
 from enum import Enum
 
 from utils.base import BasePrompt
@@ -78,7 +79,7 @@ Example:\n
 - has_numeric_info (string of 'true' or 'false')
 "Example:\n"
 "```json\n"
-'{"has_numeric_info": "TRUE"}'
+'{"has_numeric_info": "true"}'
 ```" """,
     }
 
@@ -102,7 +103,8 @@ Example:\n
             "Then create an INCORRECT VERSION that:\n"
             f"{mistakes}\n"
             "- Clearly shows the specified error types\n"
-            "- Maintains grammatical correctness"
+            "- Maintains grammatical correctness\n"
+            "- Do not put multiple mistake into one sentence\n"
         ),
 
         "formatter": """Respond STRICTLY with JSON containing:

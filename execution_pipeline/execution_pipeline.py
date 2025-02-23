@@ -1,3 +1,4 @@
+from __future__ import annotations
 import asyncio
 from typing import List, Dict, Optional
 from concurrent.futures import ProcessPoolExecutor
