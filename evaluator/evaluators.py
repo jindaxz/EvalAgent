@@ -197,6 +197,15 @@ class BERTScoreEvaluator(RAGEvaluator):
     def post_process_row(self, processed: Dict, row: Dict) -> Dict:
         pass
 
+    async def process_row(self, row: Dict, semaphore: asyncio.Semaphore) -> Dict:
+        """Process a single example with rate limiting
+           return: Dict of annotation_name(key): annotation_value
+        """
+        async with semaphore:
+            processed = self.pre_process_row(row)
+            response = await self.a_call_llm(processed)
+            return self.post_process_row(response, row)
+
     def pre_process(self, question, context, answer, **kwargs):
         # No actual prompt needed.
         pass
