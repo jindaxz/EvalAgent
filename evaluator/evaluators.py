@@ -22,7 +22,7 @@ class AnswerEquivalenceEvaluator(RAGEvaluator):
     def __init__(self, llm_class: type[LLMClient] = None, **llm_kwargs):
         super().__init__(llm_class, **llm_kwargs)
         self.EVAL_COLUMNS = ["equivalence"]
-        self.EVAL_SCORE_PREFIX = ""
+        self.EVAL_SCORE_PREFIX = "answer_equivalence"
         assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
         self.answer_column = os.getenv("ANSWER_TYPE")
         if self.EVAL_SCORE_PREFIX:
@@ -110,7 +110,7 @@ class RefusalAccuracyEvaluator(RAGEvaluator):
         self.EVAL_COLUMNS = ["refusal_accuracy"]
         assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
         self.answer_column = os.getenv("ANSWER_TYPE")
-        self.EVAL_SCORE_PREFIX = ""
+        self.EVAL_SCORE_PREFIX = "refusal_accuracy"
         if self.EVAL_SCORE_PREFIX:
             self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
         else:
@@ -202,6 +202,14 @@ class BERTScoreEvaluator(RAGEvaluator):
         """
         super().__init__()
         self.model_name = model_name
+        self.EVAL_COLUMNS = ["precision", "recall", "f1"]
+        assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
+        self.answer_column = os.getenv("ANSWER_TYPE")
+        self.EVAL_SCORE_PREFIX = "bert_score"
+        if self.EVAL_SCORE_PREFIX:
+            self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
+        else:
+            self.EVAL_SCORE_PREFIX = self.answer_column
 
     def pre_process_row(self, row: Dict) -> Dict:
         pass
@@ -213,13 +221,23 @@ class BERTScoreEvaluator(RAGEvaluator):
         pass
 
     async def process_row(self, row: Dict, semaphore: asyncio.Semaphore) -> Dict:
-        """Process a single example with rate limiting
-           return: Dict of annotation_name(key): annotation_value
-        """
         async with semaphore:
-            processed = self.pre_process_row(row)
-            response = await self.a_call_llm(processed)
-            return self.post_process_row(response, row)
+            question = row[RAGBENCH_COL_NAMES.QUESTION.value]
+            context = row[RAGBENCH_COL_NAMES.CONTEXT.value]
+            answer = row[EVAL_COL_MAP[self.answer_column]]
+            if RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value not in row:
+                raise KeyError("Missing golden_answer in row")
+            golden_answer = row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value]
+
+            if answer is None or golden_answer is None:
+                raise ValueError("answer or golden_answer is None, cannot compute BERTScore")
+        
+            
+            evaluation_result = self.evaluate(question, context, answer, golden_answer=golden_answer)
+            
+            prefixed_result = {f"{self.EVAL_SCORE_PREFIX}_{key}": value 
+                            for key, value in evaluation_result.items()}
+            return prefixed_result
 
     def pre_process(self, question, context, answer, **kwargs):
         # No actual prompt needed.
@@ -259,7 +277,7 @@ class LearningFacilitationEvaluator(RAGEvaluator):
         self.EVAL_COLUMNS = ["learning_facilitation_score", "educational_strengths", "areas_for_improvement"]
         assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
         self.answer_column = os.getenv("ANSWER_TYPE")
-        self.EVAL_SCORE_PREFIX = ""
+        self.EVAL_SCORE_PREFIX = "learning_facilitation"
         if self.EVAL_SCORE_PREFIX:
             self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
         else:
@@ -334,7 +352,7 @@ class EngagementEvaluator(RAGEvaluator):
         self.EVAL_COLUMNS = ["engagement_score", "engaging_elements", "suggestions_for_improvement"]
         assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
         self.answer_column = os.getenv("ANSWER_TYPE")
-        self.EVAL_SCORE_PREFIX = ""
+        self.EVAL_SCORE_PREFIX = "engagement"
         if self.EVAL_SCORE_PREFIX:
             self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
         else:
@@ -414,7 +432,7 @@ class ContextRelevanceEvaluator(RAGEvaluator):
         self.EVAL_COLUMNS = ["relevance_score"]
         assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
         self.answer_column = os.getenv("ANSWER_TYPE")
-        self.EVAL_SCORE_PREFIX = ""
+        self.EVAL_SCORE_PREFIX = "Context_Relevance"
         if self.EVAL_SCORE_PREFIX:
             self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
         else:
@@ -565,7 +583,7 @@ class AnswerSimilarityEvaluator(RAGEvaluator):
         """
         super().__init__()
         self.model = SentenceTransformer(model_name)
-        self.prompt_manager = ""
+        self.prompt_manager = "Answer_Similarity"
         assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
         self.answer_column = os.getenv("ANSWER_TYPE")
         self.EVAL_SCORE_PREFIX = ""
@@ -722,7 +740,7 @@ class AdherenceFaithfulnessEvaluator(RAGEvaluator):
         self.EVAL_COLUMNS = ["faithfulness_score", "unfaithful_segments"]
         assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
         self.answer_column = os.getenv("ANSWER_TYPE")
-        self.EVAL_SCORE_PREFIX = ""
+        self.EVAL_SCORE_PREFIX = "Adherence_Faithfulness"
         if self.EVAL_SCORE_PREFIX:
             self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
         else:
@@ -796,7 +814,7 @@ class ContextUtilizationEvaluator(RAGEvaluator):
         self.EVAL_COLUMNS = ["faithfulness_score", "unfaithful_segments"]
         assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
         self.answer_column = os.getenv("ANSWER_TYPE")
-        self.EVAL_SCORE_PREFIX = ""
+        self.EVAL_SCORE_PREFIX = "Context_Utilization"
         if self.EVAL_SCORE_PREFIX:
             self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
         else:
