@@ -1,0 +1,15 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Activate Conda Environment",
+			"type": "shell",
+			"command": "/bin/bash",
+			"args": [
+				"-c",
+				 "eval \"$(conda shell.bash hook)\" && conda activate base"
+			],
+			"problemMatcher": []
+		}
+	]
+}
