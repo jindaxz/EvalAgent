@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "My project description"
 authors = ["Your Name <you@example.com>"]
 readme = "README.md"
-packages = [{include = "evaluator"}]
+packages = [{include = "evaluator"}, {include = "data_annotator"}, {include = "execution_pipeline"}, {include = "agent"}]
 
 [tool.poetry.dependencies]
 python = "^3.9"
