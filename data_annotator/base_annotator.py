@@ -1,9 +1,12 @@
+from __future__ import annotations
 import asyncio
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 from datasets import Dataset
 from utils.llm import LLMClient, OpenAIClientLLM
 from data_annotator.prompt_manager import AnnotatePromptManager
+import logging
+logger = logging.getLogger(__name__)
 
 
 class DataAnnotator(ABC):
@@ -29,8 +32,8 @@ class DataAnnotator(ABC):
         """
         async with semaphore:
             processed = self.pre_process(row)
-            response = await self.call_llm(processed)
-            return self.post_process(response, row)
+            processed = await self.a_call_llm(processed)
+            return self.post_process(processed, row)
 
     @abstractmethod
     def pre_process(self, row: Dict) -> Dict:
@@ -38,11 +41,11 @@ class DataAnnotator(ABC):
         pass
 
     @abstractmethod
-    async def call_llm(self, processed_dict: Dict) -> str:
+    async def a_call_llm(self, processed_dict: Dict) -> Dict:
         """Call LLM with formatted prompt"""
         pass
 
     @abstractmethod
-    def post_process(self, response: str, example: Dict) -> Dict:
+    def post_process(self, processed: Dict, row: Dict) -> Dict:
         """Process LLM response into final format"""
         pass
