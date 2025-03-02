@@ -3,11 +3,18 @@ import json
 from typing import List, Dict, Union, Any
 from evaluator.base_evaluator import RAGEvaluator
 from evaluator.prompt_manager import EvaluationType, EvalPromptManager
-from sentence_transformers import SentenceTransformer, util
+try:
+    from sentence_transformers import SentenceTransformer, util
+    from bert_score import score as bert_score
+except ImportError as e:
+    print(f"Error: {e}")
 
 from utils.llm import LLMClient
+from utils.constants import RAGBENCH_COL_NAMES
 from utils.constants import RAGBENCH_COL_NAMES, LLM_RESPONSE, PROMPT, EVAL_COL_MAP
 import os
+import logging
+logger = logging.getLogger(__name__)
 
 
 # TODO: add AnswerEquivalenceEvaluatorWithBert
@@ -20,7 +27,7 @@ class AnswerEquivalenceEvaluator(RAGEvaluator):
     def __init__(self, llm_class: type[LLMClient] = None, **llm_kwargs):
         super().__init__(llm_class, **llm_kwargs)
         self.EVAL_COLUMNS = ["equivalence"]
-        self.EVAL_SCORE_PREFIX = ""
+        self.EVAL_SCORE_PREFIX = "answer_equivalence"
         assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
         self.answer_column = os.getenv("ANSWER_TYPE")
         if self.EVAL_SCORE_PREFIX:
@@ -108,7 +115,7 @@ class RefusalAccuracyEvaluator(RAGEvaluator):
         self.EVAL_COLUMNS = ["refusal_accuracy"]
         assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
         self.answer_column = os.getenv("ANSWER_TYPE")
-        self.EVAL_SCORE_PREFIX = ""
+        self.EVAL_SCORE_PREFIX = "refusal_accuracy"
         if self.EVAL_SCORE_PREFIX:
             self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
         else:
@@ -169,7 +176,7 @@ class RefusalAccuracyEvaluator(RAGEvaluator):
                 "reason": result1['reason']
             }
         except (json.JSONDecodeError, KeyError) as e:
-            print(f"Error parsing LLM response on refusal: {response_text}")
+            logger.info(f"Error parsing LLM response on refusal: {response_text}")
             score1 = {'refusal': 0xffffffff, "error": str(e)}
 
         try:
@@ -181,11 +188,92 @@ class RefusalAccuracyEvaluator(RAGEvaluator):
                 "reason": result2['reason']
             }
         except (json.JSONDecodeError, KeyError) as e:
-            print(f"Error parsing LLM response on refusal: {response_text}")
+            logger.info(f"Error parsing LLM response on refusal: {response_text}")
             score1 = {'underspecifie_check': 0, "error": str(e)}
 
         return {'refusal_result': score1, "underspecifie_check_score": score2}
 
+
+class BERTScoreEvaluator(RAGEvaluator):
+    """
+    Computes BERTScore between the generated answer and the ground-truth answer.
+    Paper: BERTScore: Evaluating Text Generation with BERT, https://arxiv.org/abs/1904.09675
+    """
+
+    def __init__(self, model_name: str = "bert-base-uncased"):
+        """
+        Args:
+            model_name: The pretrained model name to use for BERTScore.
+        """
+        super().__init__()
+        self.model_name = model_name
+        self.EVAL_COLUMNS = ["precision", "recall", "f1"]
+        assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
+        self.answer_column = os.getenv("ANSWER_TYPE")
+        self.EVAL_SCORE_PREFIX = "bert_score"
+        if self.EVAL_SCORE_PREFIX:
+            self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
+        else:
+            self.EVAL_SCORE_PREFIX = self.answer_column
+
+    def pre_process_row(self, row: Dict) -> Dict:
+        pass
+
+    async def a_call_llm(self, processed: Dict) -> Dict:
+        pass
+
+    def post_process_row(self, processed: Dict, row: Dict) -> Dict:
+        pass
+
+    async def process_row(self, row: Dict, semaphore: asyncio.Semaphore) -> Dict:
+        async with semaphore:
+            question = row[RAGBENCH_COL_NAMES.QUESTION.value]
+            context = row[RAGBENCH_COL_NAMES.CONTEXT.value]
+            answer = row[EVAL_COL_MAP[self.answer_column]]
+            if RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value not in row:
+                raise KeyError("Missing golden_answer in row")
+            golden_answer = row[RAGBENCH_COL_NAMES.GOLDEN_ANSWER.value]
+
+            if answer is None or golden_answer is None:
+                raise ValueError("answer or golden_answer is None, cannot compute BERTScore")
+        
+            
+            evaluation_result = self.evaluate(question, context, answer, golden_answer=golden_answer)
+            
+            prefixed_result = {f"{self.EVAL_SCORE_PREFIX}_{key}": value 
+                            for key, value in evaluation_result.items()}
+            return prefixed_result
+
+    def pre_process(self, question, context, answer, **kwargs):
+        # No actual prompt needed.
+        pass
+
+    def call_llm(self, processed_data: Any) -> str:
+        # Not calling an LLM.
+        pass
+
+    def post_process(self, llm_response: str, **kwargs) -> Dict[str, float]:
+        # Not parsing any LLM JSON output.
+        pass
+
+    def evaluate(self, question, context, answer, **kwargs) -> Dict[str, float]:
+        """
+        Perform the main logic of computing BERTScore.
+        """
+        # 1. Validate that 'golden_answer' is provided
+        if "golden_answer" not in kwargs:
+            raise KeyError("BERTScoreEvaluator requires 'golden_answer' in kwargs.")
+        golden_answer = kwargs["golden_answer"]
+
+        # 2. Compute BERTScore
+        P, R, F1 = bert_score([answer], [golden_answer], model_type=self.model_name)
+
+        # 3. Return the final score dict
+        return {
+            "precision": P.mean().item(),
+            "recall": R.mean().item(),
+            "f1": F1.mean().item()
+        }
 
 class LearningFacilitationEvaluator(RAGEvaluator):
 
@@ -194,11 +282,12 @@ class LearningFacilitationEvaluator(RAGEvaluator):
         self.EVAL_COLUMNS = ["learning_facilitation_score", "educational_strengths", "areas_for_improvement"]
         assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
         self.answer_column = os.getenv("ANSWER_TYPE")
-        self.EVAL_SCORE_PREFIX = ""
+        self.EVAL_SCORE_PREFIX = "learning_facilitation"
         if self.EVAL_SCORE_PREFIX:
             self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
         else:
             self.EVAL_SCORE_PREFIX = self.answer_column
+            
     def pre_process_row(self, row: Dict) -> Dict:
         return {PROMPT: self.pre_process(
             question=row[RAGBENCH_COL_NAMES.QUESTION.value],
@@ -238,7 +327,7 @@ class LearningFacilitationEvaluator(RAGEvaluator):
     def post_process(self, llm_response: str, **kwargs) -> Dict[str, float]:
         """Parse JSON response into scores dictionary"""
         try:
-            print(f"Raw LLM response: {llm_response}")
+            logger.info(f"Raw LLM response: {llm_response}")
             response_text = llm_response.strip().replace('```json', '').replace('```', '')
             result = json.loads(response_text)
 
@@ -252,7 +341,7 @@ class LearningFacilitationEvaluator(RAGEvaluator):
             return scores
 
         except (json.JSONDecodeError, KeyError) as e:
-            print(f"Error parsing LLM response: {response_text}")
+            logger.info(f"Error parsing LLM response: {response_text}")
             return {
                 "learning_facilitation_score": -1,
                 "educational_strengths": [],
@@ -269,7 +358,7 @@ class EngagementEvaluator(RAGEvaluator):
         self.EVAL_COLUMNS = ["engagement_score", "engaging_elements", "suggestions_for_improvement"]
         assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
         self.answer_column = os.getenv("ANSWER_TYPE")
-        self.EVAL_SCORE_PREFIX = ""
+        self.EVAL_SCORE_PREFIX = "engagement"
         if self.EVAL_SCORE_PREFIX:
             self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
         else:
@@ -313,7 +402,7 @@ class EngagementEvaluator(RAGEvaluator):
     def post_process(self, llm_response: str, **kwargs) -> Dict[str, Union[float, List[str]]]:
         """Parse JSON response into scores dictionary"""
         try:
-            print(f"Raw LLM response: {llm_response}")
+            logger.info(f"Raw LLM response: {llm_response}")
             # Clean response and parse JSON
             response_text = llm_response.strip().replace('```json', '').replace('```', '')
             result = json.loads(response_text)
@@ -328,7 +417,7 @@ class EngagementEvaluator(RAGEvaluator):
             return scores
 
         except (json.JSONDecodeError, KeyError) as e:
-            print(f"Error parsing LLM response: {llm_response}")
+            logger.info(f"Error parsing LLM response: {llm_response}")
             return {
                 "engagement_score": -1,
                 "engaging_elements": [],
@@ -349,7 +438,7 @@ class ContextRelevanceEvaluator(RAGEvaluator):
         self.EVAL_COLUMNS = ["relevance_score"]
         assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
         self.answer_column = os.getenv("ANSWER_TYPE")
-        self.EVAL_SCORE_PREFIX = ""
+        self.EVAL_SCORE_PREFIX = "Context_Relevance"
         if self.EVAL_SCORE_PREFIX:
             self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
         else:
@@ -398,7 +487,7 @@ class ContextRelevanceEvaluator(RAGEvaluator):
             }
             return score
         except (json.JSONDecodeError, KeyError) as e:
-            print(f"Error parsing LLM response: {response_text}")
+            logger.info(f"Error parsing LLM response: {response_text}")
             return {
                 "relevance_score": -1,
                 'error': str(e)
@@ -477,7 +566,7 @@ class FactualCorrectnessEvaluator(RAGEvaluator):
 
             return scores
         except (json.JSONDecodeError, KeyError) as e:
-            print(f"Error parsing LLM response: {response_text}")
+            logger.info(f"Error parsing LLM response: {response_text}")
             return {
                 "TP": -1, "FP": -1, "FN": -1, "F1_SCORE": -1,
                 'error': str(e)
@@ -500,7 +589,7 @@ class AnswerSimilarityEvaluator(RAGEvaluator):
         """
         super().__init__()
         self.model = SentenceTransformer(model_name)
-        self.prompt_manager = ""
+        self.prompt_manager = "Answer_Similarity"
         assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
         self.answer_column = os.getenv("ANSWER_TYPE")
         self.EVAL_SCORE_PREFIX = ""
@@ -628,7 +717,7 @@ class KeyPointEvaluator(RAGEvaluator):
             return scores
 
         except (json.JSONDecodeError, KeyError) as e:
-            print(f"Error parsing LLM response: {llm_response}")
+            logger.info(f"Error parsing LLM response: {llm_response}")
             return {
                 "completeness_score": -1,
                 "irrelevant_score": -1,
@@ -657,7 +746,7 @@ class AdherenceFaithfulnessEvaluator(RAGEvaluator):
         self.EVAL_COLUMNS = ["faithfulness_score", "unfaithful_segments"]
         assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
         self.answer_column = os.getenv("ANSWER_TYPE")
-        self.EVAL_SCORE_PREFIX = ""
+        self.EVAL_SCORE_PREFIX = "Adherence_Faithfulness"
         if self.EVAL_SCORE_PREFIX:
             self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
         else:
@@ -731,7 +820,7 @@ class ContextUtilizationEvaluator(RAGEvaluator):
         self.EVAL_COLUMNS = ["faithfulness_score", "unfaithful_segments"]
         assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
         self.answer_column = os.getenv("ANSWER_TYPE")
-        self.EVAL_SCORE_PREFIX = ""
+        self.EVAL_SCORE_PREFIX = "Context_Utilization"
         if self.EVAL_SCORE_PREFIX:
             self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
         else:
@@ -770,13 +859,13 @@ class ContextUtilizationEvaluator(RAGEvaluator):
     def post_process(self, llm_response, **kwargs):
         assert "context" in kwargs, f"Missing context"
         try:
-            print(f"Raw LLM response: {llm_response}")
+            logger.info(f"Raw LLM response: {llm_response}")
             response_text = llm_response.strip().replace('```json', '').replace('```', '')
             result = json.loads(response_text)
 
             context = kwargs['context']
 
-            print(f"Context: {context}")
+            logger.info(f"Context: {context}")
             relevant_context = result.get("relevant_context", [])
             # irrelevant_context = result.get("irrelevant_context", [])
 
@@ -785,7 +874,7 @@ class ContextUtilizationEvaluator(RAGEvaluator):
             context_utilization_score = relevant_count / total_context if total_context > 0 else 0
             return context_utilization_score
         except (json.JSONDecodeError, KeyError) as e:
-            print(f"Error parsing LLM response: {llm_response}")
+            logger.info(f"Error parsing LLM response: {llm_response}")
             return {
                 "context_utilization_score": -1,
                 'error': str(e)
