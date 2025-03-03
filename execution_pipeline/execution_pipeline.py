@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Union
+import pandas as pd
 from concurrent.futures import ProcessPoolExecutor
 from datasets import Dataset, DatasetDict, load_dataset
 from data_annotator.base_annotator import DataAnnotator
@@ -82,30 +83,46 @@ class ExecutionPipeline:
 
     async def run_pipeline(
         self,
-        dataset_name: str,
-        save_path: str,
+        dataset_name: Optional[str] = None,
+        dataset_df: Optional[pd.DataFrame] = None,
+        save_path: Optional[str] = None,
         upload_to_hub: bool = False,
         repo_id: Optional[str] = None,
         **kwargs
-    ) -> DatasetDict:
+    ) -> Union[DatasetDict, pd.DataFrame]:
+        """Handle both HF datasets and pandas DataFrames"""
         # Load initial dataset
-        initial_dataset = load_data(dataset_name)
+        input_was_dataframe = False
+        if dataset_name is not None:
+            initial_dataset = load_data(dataset_name)
+        elif dataset_df is not None:
+            initial_dataset = DatasetDict({"train": Dataset.from_pandas(dataset_df)})
+            input_was_dataframe = True
+        else:
+            raise ValueError("Must provide either dataset_name or dataset_df")
+
         current_dataset = initial_dataset
 
-        # Create fresh instances in executor processes
-        for _cls, executor in zip(self.processor_classes, self.executors):
+        # Process through all executors
+        for _, executor in zip(self.processor_classes, self.executors):
             current_dataset = await executor.run(dataset=current_dataset, **kwargs)
 
-        current_dataset.save_to_disk(save_path)
+        # Save processed dataset
+        if save_path is not None:
+            current_dataset.save_to_disk(save_path)
 
         # Upload to Hub if requested
         if upload_to_hub:
             if not repo_id:
                 raise ValueError("repo_id is required for Hub upload")
-
             current_dataset.push_to_hub(repo_id=repo_id, token=os.getenv("HF_TOKEN"))
 
-        return current_dataset
+        # Return appropriate type
+        return (
+            current_dataset["train"].to_pandas()
+            if input_was_dataframe
+            else current_dataset
+        )
 
 
 class SyntheticAnswerGenerationPipeline:
@@ -114,16 +131,18 @@ class SyntheticAnswerGenerationPipeline:
 
     async def run_pipeline(
         self,
-        dataset_name: str,
-        save_path: str = None,
+        dataset_name: Optional[str] = None,
+        dataset_df: Optional[pd.DataFrame] = None,
+        save_path: Optional[str] = None,
         upload_to_hub: bool = False,
-        repo_id: str = None,
-    ):
+        repo_id: Optional[str] = None,
+    ) -> Union[DatasetDict, pd.DataFrame]:
         pipeline = ExecutionPipeline(
             processor_classes=[NumMistakesAnnotator, MistakeAnswerGenerator]
         )
-        await pipeline.run_pipeline(
+        return await pipeline.run_pipeline(
             dataset_name=dataset_name,
+            dataset_df=dataset_df,
             save_path=save_path,
             upload_to_hub=upload_to_hub,
             repo_id=repo_id,
