@@ -15,7 +15,7 @@ class DynamicEvaluationOrchestrator:
     def _llm_config(self) -> Dict:
         return {"config_list": [
             {"model": "meta-llama/Llama-3.3-70B-Instruct",
-             "base_url": "https://api-eu.centml.com/openai/v1",
+             "base_url": os.getenv("BASE_URL"),
              "api_key": os.getenv("OPENAI_API_KEY")}]}
 
     def _initialize_base_roles(self) -> Dict[str, AssistantAgent]:

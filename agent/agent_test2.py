@@ -1,6 +1,10 @@
 import importlib
 import json
 
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from autogen_agentchat.agents import AssistantAgent, UserProxyAgent
 from autogen_agentchat.teams import RoundRobinGroupChat
 from autogen_agentchat.conditions import MaxMessageTermination
@@ -10,12 +14,13 @@ from autogen_ext.models.openai import OpenAIChatCompletionClient
 from autogen_core import CancellationToken
 from typing import Dict, List, Tuple
 import re
-import os
+
 import asyncio
 
 import inspect
 from importlib.metadata import version, packages_distributions
 from evaluator.base_evaluator import RAGEvaluator
+
 
 
 def get_evaluator_classes():
@@ -48,8 +53,8 @@ class DynamicEvaluationOrchestrator:
 
     def _create_model_client(self):
         return OpenAIChatCompletionClient(
-            model="meta-llama/Llama-3.3-70B-Instruct",
-            base_url="https://api-eu.centml.com/openai/v1",
+            model = os.getenv("MODEL_ID", "meta-llama/Llama-3.3-70B-Instruct"),
+            base_url = os.getenv("BASE_URL", "https://api-eu.centml.com/openai/v1"),
             api_key=os.getenv("OPENAI_API_KEY"),
             model_info={
                 "vision": False,
