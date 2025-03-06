@@ -638,7 +638,7 @@ class AnswerSimilarityEvaluator(RAGEvaluator):
         }
 
 
-class KeyPointEvaluator(RAGEvaluator):
+class KeyPointEvaluators(RAGEvaluator):
     """
     From https://arxiv.org/abs/2408.01262, using extracted key points generate from ground truth answer to check with generated answer,
     using the categorized key_points count to calculate generation scores. 
@@ -709,8 +709,8 @@ class KeyPointEvaluator(RAGEvaluator):
 
             scores = {
                 "completeness_score": len(result['complete_ids']) / kwargs["num_key_points"],
-                "irrelevant_score": len(result['irrelevant_ids']) / kwargs["num_key_points"],
-                "hallucination_score": len(result['hallucinate_ids']) / kwargs["num_key_points"],
+                "irrelevant_score": 1 - len(result['irrelevant_ids']) / kwargs["num_key_points"],
+                "hallucination_score": 1 - len(result['hallucinate_ids']) / kwargs["num_key_points"],
                 "raw_output": result
             }
 
@@ -731,6 +731,95 @@ class KeyPointEvaluator(RAGEvaluator):
         processed_data = self.pre_process(question, context, answer, **kwargs)
         llm_response = self.call_llm(processed_data)
         return self.post_process(llm_response, num_key_points=self.num_key_points)
+
+class KeypointCompletenessEvaluator(KeyPointEvaluators):
+    """
+    From https://arxiv.org/abs/2408.01262, using extracted key points generate from ground truth answer to check with
+    generated answer, using the categorized key_points count to calculate generation scores. Completeness score is
+    calculated by portion of key points that in generated answer and are relevant and consistent with the standard
+    answer.
+    """
+    def __init__(self, llm_class: type[LLMClient] = None, **llm_kwargs):
+        super().__init__(llm_class, **llm_kwargs)
+        self.EVAL_COLUMNS = ["completeness_score"]
+        self.EVAL_SCORE_PREFIX = "key_point"
+        assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
+        self.answer_column = os.getenv("ANSWER_TYPE")
+        if self.EVAL_SCORE_PREFIX:
+            self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
+        else:
+            self.EVAL_SCORE_PREFIX = self.answer_column
+
+    def post_process(self, llm_response, **kwargs):
+        scores = super().post_process(llm_response, **kwargs)
+        return {k: v for k, v in scores if k in self.EVAL_COLUMNS}
+
+    def post_process_row(self, processed: Dict, row: Dict) -> Dict:
+        result = super().post_process(llm_response=processed[LLM_RESPONSE], num_key_points=processed['num_key_points'])
+        try:
+            return {f"{self.EVAL_SCORE_PREFIX}_{key}": result[key] for key in self.EVAL_COLUMNS}
+        except KeyError:
+            return {f"{self.EVAL_SCORE_PREFIX}_{key}": None for key in self.EVAL_COLUMNS}
+
+
+class KeypointIrrelevantEvaluator(KeyPointEvaluators):
+    """
+    From https://arxiv.org/abs/2408.01262, using extracted key points generate from ground truth answer to check with
+    generated answer, using the categorized key_points count to calculate generation scores. Irrelevant score is
+    calculated by one minus the portion of key points that are not covered or mentioned in the generated answer.
+    """
+    def __init__(self, llm_class: type[LLMClient] = None, **llm_kwargs):
+        super().__init__(llm_class, **llm_kwargs)
+        self.EVAL_COLUMNS = ["irrelevant_score"]
+        self.EVAL_SCORE_PREFIX = "key_point"
+        assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
+        self.answer_column = os.getenv("ANSWER_TYPE")
+        if self.EVAL_SCORE_PREFIX:
+            self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
+        else:
+            self.EVAL_SCORE_PREFIX = self.answer_column
+
+    def post_process(self, llm_response, **kwargs):
+        scores = super().post_process(llm_response, **kwargs)
+        return {k: v for k, v in scores if k in self.EVAL_COLUMNS}
+
+    def post_process_row(self, processed: Dict, row: Dict) -> Dict:
+        result = super().post_process(llm_response=processed[LLM_RESPONSE], num_key_points=processed['num_key_points'])
+        try:
+            return {f"{self.EVAL_SCORE_PREFIX}_{key}": result[key] for key in self.EVAL_COLUMNS}
+        except KeyError:
+            return {f"{self.EVAL_SCORE_PREFIX}_{key}": None for key in self.EVAL_COLUMNS}
+
+
+class KeypointHallucinationEvaluator(KeyPointEvaluators):
+    """
+    From https://arxiv.org/abs/2408.01262, using extracted key points generate from ground truth answer to check with
+    generated answer, using the categorized key_points count to calculate generation scores. Irrelevant score is
+    calculated by one minus the portion of key points are incorrectly addressed or contain significant errors in the
+    generated answer.
+    """
+    def __init__(self, llm_class: type[LLMClient] = None, **llm_kwargs):
+        super().__init__(llm_class, **llm_kwargs)
+        self.EVAL_COLUMNS = ["hallucination_score"]
+        self.EVAL_SCORE_PREFIX = "key_point"
+        assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
+        self.answer_column = os.getenv("ANSWER_TYPE")
+        if self.EVAL_SCORE_PREFIX:
+            self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
+        else:
+            self.EVAL_SCORE_PREFIX = self.answer_column
+
+    def post_process(self, llm_response, **kwargs):
+        scores = super().post_process(llm_response, **kwargs)
+        return {k: v for k, v in scores if k in self.EVAL_COLUMNS}
+
+    def post_process_row(self, processed: Dict, row: Dict) -> Dict:
+        result = super().post_process(llm_response=processed[LLM_RESPONSE], num_key_points=processed['num_key_points'])
+        try:
+            return {f"{self.EVAL_SCORE_PREFIX}_{key}": result[key] for key in self.EVAL_COLUMNS}
+        except KeyError:
+            return {f"{self.EVAL_SCORE_PREFIX}_{key}": None for key in self.EVAL_COLUMNS}
+
 
 
 class AdherenceFaithfulnessEvaluator(RAGEvaluator):
