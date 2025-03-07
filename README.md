@@ -1,3 +1,5 @@
+[![Dataset on HF](https://huggingface.co/datasets/huggingface/badges/resolve/main/dataset-on-hf-sm-dark.svg)]([https://huggingface.co/datasets](https://huggingface.co/RAGEVALUATION-HJKMY))
+
 # RAG-LLM-Metric
 
 A retrieval-augmented generation LLM evaluation framework with optional GPU acceleration.
