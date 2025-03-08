@@ -506,7 +506,6 @@ class FactualCorrectnessEvaluator(RAGEvaluator):
         self.EVAL_SCORE_PREFIX = "factual_correctness"
         assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
         self.answer_column = os.getenv("ANSWER_TYPE")
-        self.EVAL_SCORE_PREFIX = ""
         if self.EVAL_SCORE_PREFIX:
             self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
         else:
