@@ -132,7 +132,9 @@ class AnswerEquivalenceEvaluator(RAGEvaluator):
 
 # TODO: implement _process_split
 class RefusalAccuracyEvaluator(RAGEvaluator):
-
+    """
+    https://arxiv.org/html/2412.12300v1
+    """
     def __init__(self, llm_class: type[LLMClient] = None, **llm_kwargs):
         super().__init__(llm_class, **llm_kwargs)
         self.EVAL_COLUMNS = ["refusal_accuracy"]
@@ -651,7 +653,6 @@ class FactualCorrectnessEvaluator(RAGEvaluator):
             "ANSWER_TYPE", None
         ), "Environment variable ANSWER_TYPE must be defined for evaluation"
         self.answer_column = os.getenv("ANSWER_TYPE")
-        self.EVAL_SCORE_PREFIX = ""
         if self.EVAL_SCORE_PREFIX:
             self.EVAL_SCORE_PREFIX = f"{self.answer_column}_{self.EVAL_SCORE_PREFIX}"
         else:
@@ -1150,11 +1151,8 @@ class ContextUtilizationEvaluator(RAGEvaluator):
 
     def __init__(self, llm_class: type[LLMClient] = None, **llm_kwargs):
         super().__init__(llm_class, **llm_kwargs)
-        self.context = []
-        self.EVAL_COLUMNS = ["faithfulness_score", "unfaithful_segments"]
-        assert os.getenv(
-            "ANSWER_TYPE", None
-        ), "Environment variable ANSWER_TYPE must be defined for evaluation"
+        self.EVAL_COLUMNS = ["context_utilization_score"]
+        assert os.getenv("ANSWER_TYPE", None), "Environment variable ANSWER_TYPE must be defined for evaluation"
         self.answer_column = os.getenv("ANSWER_TYPE")
         self.EVAL_SCORE_PREFIX = "Context_Utilization"
         if self.EVAL_SCORE_PREFIX:
@@ -1176,14 +1174,11 @@ class ContextUtilizationEvaluator(RAGEvaluator):
         }
 
     def pre_process_row(self, row: Dict) -> Dict:
-        return {
-            PROMPT: self.pre_process(
-                question=row[RAGBENCH_COL_NAMES.QUESTION.value],
-                context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
-                answer=row[EVAL_COL_MAP[self.answer_column]],
-            ),
-            "context": row[RAGBENCH_COL_NAMES.CONTEXT.value],
-        }
+        return {PROMPT: self.pre_process(
+            question=row[RAGBENCH_COL_NAMES.QUESTION.value],
+            context=row[RAGBENCH_COL_NAMES.CONTEXT.value],
+            answer=row[EVAL_COL_MAP[self.answer_column]],  
+        )}
 
     async def a_call_llm(self, processed: Dict) -> Dict:
         assert PROMPT in processed, f"Prompt missing"
@@ -1203,7 +1198,6 @@ class ContextUtilizationEvaluator(RAGEvaluator):
             }
 
     def pre_process(self, question, context, answer, **kwargs):
-        self.context = context
         return EvalPromptManager().build_prompt(
             question=question,
             answer=answer,
@@ -1215,40 +1209,18 @@ class ContextUtilizationEvaluator(RAGEvaluator):
         return self.llm.generate(processed_data)
 
     def post_process(self, llm_response, **kwargs):
-        assert "context" in kwargs, f"Missing context"
         try:
-            logger.info(f"Raw LLM response: {llm_response}")
-            response_text = (
-                llm_response.strip().replace("```json", "").replace("```", "")
-            )
+            response_text = llm_response.strip().replace('```json', '').replace('```', '')
             result = json.loads(response_text)
 
-            context = kwargs["context"]
-
-            logger.info(f"Context: {context}")
-            relevant_context = result.get("relevant_context", [])
+            relevant_context = result.get("relevant_context_number", 0)
             # irrelevant_context = result.get("irrelevant_context", [])
-
-            total_context = len(context)
-            relevant_count = len(relevant_context)
-            context_utilization_score = (
-                relevant_count / total_context if total_context > 0 else 0
-            )
-            return context_utilization_score
+            total_context = result.get("context_number", 0)
+            context_utilization_score = relevant_context / total_context if total_context > 0 else 0
+            return {"context_utilization_score":context_utilization_score}
         except (json.JSONDecodeError, KeyError) as e:
             logger.info(f"Error parsing LLM response: {llm_response}")
             return {"context_utilization_score": -1, "error": str(e)}
-
-    def evaluate(
-        self,
-        answer: str | List[str] = None,
-        question: str | List[str] = None,
-        context: str | List[str] = None,
-        **kwargs,
-    ) -> Dict:
-        processed_data = self.pre_process(question, context, answer, **kwargs)
-        llm_response = self.call_llm(processed_data)
-        return self.post_process(llm_response, context=self.context if hasattr(self, "context") else [])
 
 
 
