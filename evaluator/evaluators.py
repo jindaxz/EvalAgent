@@ -109,7 +109,9 @@ class AnswerEquivalenceEvaluator(RAGEvaluator):
 
 # TODO: implement _process_split
 class RefusalAccuracyEvaluator(RAGEvaluator):
-
+    """
+    https://arxiv.org/html/2412.12300v1
+    """
     def __init__(self, llm_class: type[LLMClient] = None, **llm_kwargs):
         super().__init__(llm_class, **llm_kwargs)
         self.EVAL_COLUMNS = ["refusal_accuracy"]
